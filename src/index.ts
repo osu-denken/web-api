@@ -7,6 +7,9 @@ export default {
     const url = `https://api.github.com/repos/osu-denken/blog/contents/_posts/test.md`;
 
     const content = btoa("# タイトル\nこれはテストです。");
+	if (!env.GITHUB_TOKEN) {
+		return new Response("GITHUB_TOKEN is not set", { status: 500 });
+	}
 
     const res = await fetch(url, {
       method: "PUT",
