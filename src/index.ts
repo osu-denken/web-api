@@ -27,6 +27,7 @@ export default {
       headers: {
         "Authorization": `token ${env.GITHUB_TOKEN}`,
         "Content-Type": "application/json",
+		"User-Agent": "osu-denken-admin-cloudflare-worker"
       },
       body: JSON.stringify({
         message: "Add new post",
