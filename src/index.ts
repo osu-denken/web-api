@@ -66,7 +66,7 @@ export default {
 		const path = `_posts/test.md`;
 		const url = `https://api.github.com/repos/` + OWNER + `/` + REPO + `/contents/${path}`;
 
-		let text = `"# hogehoge\n`;
+		let text = `# hogehoge\n\n`;
 
 		text += Date.now().toString();
 
