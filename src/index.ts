@@ -75,14 +75,21 @@ export default {
 		try {
 			const res = await updatePost(path, content, "Add test post via Cloudflare Worker", env.GITHUB_TOKEN);
 
-			const text = await res.text();
+			const data = await res.json();
 			return new Response(
-			JSON.stringify({
-				status: res.status,
-				statusText: res.statusText,
-				body: text
-			}, null, 2),
-			{ status: res.status, headers: { "Content-Type": "application/json" } }
+				JSON.stringify(
+					{
+						status: res.status,
+						statusText: res.statusText,
+						body: data
+					}, null, 2
+				),
+				{ 
+					status: res.status, 
+					headers: {
+						"Content-Type": "application/json" 
+					} 
+				}
 			);
 
 		} catch (err: any) {
