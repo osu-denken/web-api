@@ -1,8 +1,13 @@
+const OWNER = "osu-denken";
+const REPO = "blog";
+const BRANCH = "main";
+
+
 export interface Env {
   GITHUB_TOKEN: string;
 }
 
-function encodeBase64(str: string) {
+function txt2base64(str: string) {
   const bytes = new TextEncoder().encode(str);
   let binary = '';
   for (let i = 0; i < bytes.length; i++) {
@@ -11,6 +16,49 @@ function encodeBase64(str: string) {
   return btoa(binary);
 }
 
+function requestGitHub(url: string, method: string, token: string, body?: any) {
+  const headers: Record<string, string> = {
+	"Authorization": `token ${token}`,
+	"Content-Type": "application/json",
+	"User-Agent": "osu-denken-admin-cloudflare-worker"
+  };
+  return fetch(url, {
+	method,
+	headers,
+	body: body ? JSON.stringify(body) : undefined
+  });
+}
+
+function getListPosts(token: string) {
+  const url = `https://api.github.com/repos/osu-denken/blog/contents/_posts`;
+  return requestGitHub(url, "GET", token);
+}
+
+function getPost(path: string, token: string) {
+  const url = `https://api.github.com/repos/osu-denken/blog/contents/${path}`;
+  return requestGitHub(url, "GET", token);
+}
+
+async function updatePost(path: string, content: string, message: string, token: string, sha?: string) {
+  const url = `https://api.github.com/repos/osu-denken/blog/contents/${path}`;
+  const body: { message: string; content: string; branch: string; sha?: string } = {
+	message,
+	content,
+	branch: BRANCH
+  };
+  
+  if (sha) {
+	body.sha = sha;
+  } else {
+	const req = await requestGitHub(url, "GET", token);
+	if (req.status === 200) {
+		const data = await req.json() as { sha: string };
+		body.sha = data.sha;
+	}
+  }
+
+  return requestGitHub(url, "PUT", token, body);
+}
 
 export default {
   async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
@@ -19,43 +67,11 @@ export default {
   }
 
   const path = `_posts/test.md`;
-  const url = `https://api.github.com/repos/osu-denken/blog/contents/${path}`;
-  const content = encodeBase64("# タイトル\nこれはテストです。");
+  const url = `https://api.github.com/repos/` + OWNER + `/` + REPO + `/contents/${path}`;
+  const content = txt2base64("# hogehoge");
 
   try {
-	const req = await fetch(url, {
-		method: "GET",
-		headers: {
-			"Authorization": `token ${env.GITHUB_TOKEN}`,
-			"User-Agent": "osu-denken-admin-cloudflare-worker"
-		}
-	})
-
-	let sha: string | null = null;
-	if (req.status === 200) {
-		const data = await req.json() as { sha: string };
-		sha = data.sha;
-	}
-
-	const bodyData: { message: string; content: string; branch: string; sha?: string } = {
-		message: "Add new post",
-		content: content,
-		branch: "main"
-	};
-
-	if (sha) {
-		bodyData.sha = sha;
-	}
-
-    const res = await fetch(url, {
-      method: "PUT",
-      headers: {
-        "Authorization": `token ${env.GITHUB_TOKEN}`,
-        "Content-Type": "application/json",
-		"User-Agent": "osu-denken-admin-cloudflare-worker"
-      },
-      body: JSON.stringify(bodyData)
-    });
+	const res = await updatePost(path, content, "Add test post via Cloudflare Worker", env.GITHUB_TOKEN);
 
     const text = await res.text();
     return new Response(
