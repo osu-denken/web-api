@@ -18,10 +18,35 @@ export default {
     return new Response("GITHUB_TOKEN is not set", { status: 500 });
   }
 
-  const url = `https://api.github.com/repos/osu-denken/blog/contents/_posts/test.md`;
+  const path = `_posts/test.md`;
+  const url = `https://api.github.com/repos/osu-denken/blog/contents/${path}`;
   const content = encodeBase64("# タイトル\nこれはテストです。");
 
   try {
+	const req = await fetch(url, {
+		method: "GET",
+		headers: {
+			"Authorization": `token ${env.GITHUB_TOKEN}`,
+			"User-Agent": "osu-denken-admin-cloudflare-worker"
+		}
+	})
+
+	let sha: string | null = null;
+	if (req.status === 200) {
+		const data = await req.json() as { sha: string };
+		sha = data.sha;
+	}
+
+	const bodyData: { message: string; content: string; branch: string; sha?: string } = {
+		message: "Add new post",
+		content: content,
+		branch: "main"
+	};
+
+	if (sha) {
+		bodyData.sha = sha;
+	}
+
     const res = await fetch(url, {
       method: "PUT",
       headers: {
@@ -29,11 +54,7 @@ export default {
         "Content-Type": "application/json",
 		"User-Agent": "osu-denken-admin-cloudflare-worker"
       },
-      body: JSON.stringify({
-        message: "Add new post",
-        content: content,
-        branch: "main"
-      })
+      body: JSON.stringify(bodyData)
     });
 
     const text = await res.text();
