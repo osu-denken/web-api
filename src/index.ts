@@ -65,7 +65,12 @@ export default {
 
 		const path = `_posts/test.md`;
 		const url = `https://api.github.com/repos/` + OWNER + `/` + REPO + `/contents/${path}`;
-		const content = txt2base64("# hogehoge");
+
+		let text = `"# hogehoge\n`;
+
+		text += Date.now().toString();
+
+		const content = txt2base64(text);
 
 		try {
 			const res = await updatePost(path, content, "Add test post via Cloudflare Worker", env.GITHUB_TOKEN);
