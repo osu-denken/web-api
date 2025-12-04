@@ -1,18 +1,25 @@
-/**
- * Welcome to Cloudflare Workers! This is your first worker.
- *
- * - Run `npm run dev` in your terminal to start a development server
- * - Open a browser tab at http://localhost:8787/ to see your worker in action
- * - Run `npm run deploy` to publish your worker
- *
- * Bind resources to your worker in `wrangler.jsonc`. After adding bindings, a type definition for the
- * `Env` object can be regenerated with `npm run cf-typegen`.
- *
- * Learn more at https://developers.cloudflare.com/workers/
- */
+export interface Env {
+  GITHUB_TOKEN: string;
+}
 
 export default {
-	async fetch(request, env, ctx): Promise<Response> {
-		return new Response('Hello OSU-DENKEN');
-	},
+  async fetch(request, env: Env, ctx: any): Promise<Response> {
+    const url = `https://api.github.com/repos/osu-denken/blog/_posts/test.md`;
+
+    const content = btoa("# タイトル\nこれはテストです。");
+
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: {
+        "Authorization": `token ${env.GITHUB_TOKEN}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        message: "Add new post",
+        content: content,
+      })
+    });
+
+    return new Response(await res.text(), { status: res.status });
+  }
 } satisfies ExportedHandler<Env>;
