@@ -28,7 +28,10 @@ export function createJsonResponse(status: number, statusText: string, body: any
 		{ 
 			status, 
 			headers: {
-				"Content-Type": "application/json" 
+				"Content-Type": "application/json",
+				"Access-Control-Allow-Origin": "*",
+				"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+				"Access-Control-Allow-Headers": "Content-Type, Authorization",
 			} 
 		}
 	);
@@ -38,7 +41,10 @@ export function createJsonResponseRaw(data: any) {
     return new Response(JSON.stringify(data, null, 2), {
         status: 200,
         headers: {
-            "Content-Type": "application/json"
+            "Content-Type": "application/json",
+			"Access-Control-Allow-Origin": "*",
+			"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+			"Access-Control-Allow-Headers": "Content-Type, Authorization",
         }
     });
 }
