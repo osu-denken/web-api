@@ -30,7 +30,7 @@ function requestGitHub(url: string, method: string, token: string, body?: any) {
 
 function getList(token: string) {
 	try {
-		const url = `https://api.github.com/repos/osu-denken/blog/contents/_posts`;
+		const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts`;
 		return requestGitHub(url, "GET", token);
 	} catch (e) {
 		return Promise.reject(e);
@@ -39,7 +39,7 @@ function getList(token: string) {
 
 function getPost(path: string, token: string) {
 	try {
-		const url = `https://api.github.com/repos/osu-denken/blog/contents/_posts/${path}`;
+		const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts/${path}`;
 		return requestGitHub(url, "GET", token);
 	} catch (e) {
 		return Promise.reject(e);
@@ -48,7 +48,7 @@ function getPost(path: string, token: string) {
 
 async function updatePost(path: string, content: string, message: string, token: string, sha?: string) {
 	try {
-		const url = `https://api.github.com/repos/osu-denken/blog/contents/${path}`;
+		const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts/${path}`;
 		const body: { message: string; content: string; branch: string; sha?: string } = {
 			message,
 			content,

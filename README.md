@@ -82,3 +82,8 @@ page: ページ名
 ```
 <ページ内容>
 ```
+
+## シークレットキーについて
+- GITHUB_TOKEN - GitHub APIトークン
+- AUTH_TOKEN - OSU DENKEN APIトークン
+
