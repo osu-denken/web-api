@@ -49,11 +49,15 @@ export function createJsonResponseRaw(data: any) {
     });
 }
 
-export function sha256(message: string): Promise<string> {
-    const msgBuffer = new TextEncoder().encode(message);
-    return crypto.subtle.digest("SHA-256", msgBuffer).then((hashBuffer) => {
-        const hashArray = Array.from(new Uint8Array(hashBuffer));
+export function sha256(data: string): Promise<string> {
+    const buf = new TextEncoder().encode(data);
+    return crypto.subtle.digest("SHA-256", buf).then((hashBuf) => {
+        const hashArray = Array.from(new Uint8Array(hashBuf));
         const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
         return hashHex;
     });
+}
+
+export function die(msg: string) {
+	return createJsonResponse(500, "Internal Server Error", { error: msg });
 }

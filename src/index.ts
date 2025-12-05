@@ -80,9 +80,9 @@ export default {
 
 		if (request.method === "OPTIONS") {
 			return new Response(null, { status: 204, headers: {
-			"Access-Control-Allow-Origin": "*",
-			"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-			"Access-Control-Allow-Headers": "Content-Type, Authorization",
+				"Access-Control-Allow-Origin": "*",
+				"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+				"Access-Control-Allow-Headers": "Content-Type, Authorization",
 			}});
 		}
 
@@ -149,7 +149,7 @@ export default {
 			if (pathname === "/auth") {
 				const authHeader = request.headers.get("Authorization");
 				let user_id: string | null = null;
-				let hashed_pass: string | null = null;
+				let hashed_pass: string | null = null; // sha256されたパスワード
 
 				if (authHeader && authHeader.startsWith("Basic ")) {
 					const base64Credentials = authHeader.replace("Basic ", "");
@@ -178,21 +178,16 @@ export default {
 			// 記事の更新、作成
 			if (pathname === "/update") {
 				const token = request.headers.get("Authorization");
-				if (!token) {
-					return createJsonResponse(401, "Unauthorized", { error: "Authorization header is required" });					
-				}
 
-				if (token.replace("Bearer ", "") !== env.AUTH_TOKEN) {
+				// トークン認証
+				if (!token || token.replace("Bearer ", "") !== env.AUTH_TOKEN) {
 					return createJsonResponse(403, "Forbidden", { error: "Invalid authorization token" });
 				}
 
-				//return createJsonResponse(500, "Internal Server Error", { error: "現在、利用できません。" });
-
-				if (request.method !== "POST") {
+				if (request.method !== "POST") { // postだけ許可する
 					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
 				}
 
-				// page、content POSTを受け取って記事更新するコードは以下に置いておく
 				const page = request.headers.get("page");
 				const content = request.headers.get("content");
 				if (!page || !content) {
