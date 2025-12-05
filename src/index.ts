@@ -189,7 +189,7 @@ export default {
 				}
 
 				const page = request.headers.get("page");
-				const content = request.headers.get("content");
+				const content = request.headers.get("content") || await request.text();
 				if (!page || !content) {
 					return createJsonResponse(400, "Bad Request", { error: "page and content headers are required" });
 				}
