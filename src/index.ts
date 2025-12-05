@@ -2,7 +2,8 @@ import {
   txt2base64,
   base642txt,
   createJsonResponse,
-  createJsonResponseRaw
+  createJsonResponseRaw,
+  sha256
 } from "./util";
 
 const OWNER = "osu-denken";
@@ -154,11 +155,12 @@ export default {
 				}
 				
 				if (!user_id || !hashed_pass) {
-					return createJsonResponse(400, "Bad Request", { error: "user and pass are required" });
+					return createJsonResponse(400, "Bad Request", { error: "user and pass (sha256) are required" });
 				}
 
 				// sha256
-				if (user_id === "admin" && hashed_pass === "0fba3f80850c2414b60b26ed085183d25b906d6a65db4929e3af0f997894a761") {
+				const hashed_hashed_pass = await sha256(hashed_pass);
+				if (user_id === "admin" && hashed_hashed_pass === "3eaff5f1080be960f83978f99acce9a19ed2f0a0d197f7a816fadec50d9d1286") {
 					return createJsonResponseRaw({ token: env.AUTH_TOKEN });
 				} else {
 					return createJsonResponse(403, "Forbidden", { error: "Invalid user or pass (sha256)" });
