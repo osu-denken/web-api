@@ -78,6 +78,14 @@ export default {
 		const url = new URL(request.url);
 		const pathname: string = url.pathname;
 
+		if (request.method === "OPTIONS") {
+			return new Response(null, { status: 204, headers: {
+			"Access-Control-Allow-Origin": "*",
+			"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+			"Access-Control-Allow-Headers": "Content-Type, Authorization",
+			}});
+		}
+
 		try {
 			if (pathname === "/") {
 				return new Response("Welcome to osu-denken api!", { status: 200 });
@@ -201,42 +209,6 @@ export default {
 			return createJsonResponse(500, "Internal Server Error", { error: e.toString() });
 		}
 
-
-		const path = `_posts/test.md`;
-
-		let text = `# hogehoge\n\n`;
-
-		text += Date.now().toString();
-
-		const content = txt2base64(text);
-
-		try {
-			const res = await updatePost(path, content, "Add test post via Cloudflare Worker", env.GITHUB_TOKEN);
-
-			const data = await res.json();
-			return new Response(
-				JSON.stringify(
-					{
-						status: res.status,
-						statusText: res.statusText,
-						body: data
-					}, null, 2
-				),
-				{ 
-					status: res.status, 
-					headers: {
-						"Content-Type": "application/json" 
-					} 
-				}
-			);
-
-		} catch (err: any) {
-			return new Response(
-			JSON.stringify({
-				error: err.toString()
-			}, null, 2),
-			{ status: 500, headers: { "Content-Type": "application/json" } }
-			);
-		}
+		return createJsonResponse(404, "Not Found", { error: "Endpoint not found" });
 	}
 } satisfies ExportedHandler<Env>;
