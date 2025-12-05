@@ -1,18 +1,12 @@
+import "./util.ts";
+
 const OWNER = "osu-denken";
 const REPO = "blog";
 const BRANCH = "main";
 
 export interface Env {
 	GITHUB_TOKEN: string;
-}
-
-function txt2base64(str: string) {
-	const bytes = new TextEncoder().encode(str);
-	let binary = '';
-	for (let i = 0; i < bytes.length; i++) {
-		binary += String.fromCharCode(bytes[i]);
-	}
-	return btoa(binary);
+	AUTH_TOKEN: string;
 }
 
 function requestGitHub(url: string, method: string, token: string, body?: any) {
@@ -71,70 +65,128 @@ async function updatePost(path: string, content: string, message: string, token:
 	}
 }
 
-function createJsonResponse(status: number, statusText: string, body: any) {
-	return new Response(
-		JSON.stringify(
-			{
-				status,
-				statusText,
-				body
-			}, null, 2
-		),
-		{ 
-			status, 
-			headers: {
-				"Content-Type": "application/json" 
-			} 
-		}
-	);
-}
-
 export default {
 	async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
 		if (!env.GITHUB_TOKEN) return new Response("GITHUB_TOKEN is not set", { status: 500 });
-		// REST API style
-		// api.osudenken4dev.workers.dev/list
-		// api.osudenken4dev.workers.dev/get?id=xxxx.md
-		// api.osudenken4dev.workers.dev/update
 
 		const url = new URL(request.url);
 		const pathname: string = url.pathname;
 
 		try {
+			if (pathname === "/") {
+				return new Response("Welcome to osu-denken api!", { status: 200 });
+			}
+
+			if (pathname === "/ping") {
+				return new Response("pong", { status: 200 });
+			}
+
+			// 記事一覧の取得
 			if (pathname === "/list") {
 				const res = await getList(env.GITHUB_TOKEN);
+				const data: any = await res.json();
 
-				const data = await res.json();
-				return createJsonResponse(res.status, res.statusText, data);
+				const result = data.map((page: any) => ({
+					name: page.name.replace(".md", ""),
+					sha: page.sha,
+					size: page.size
+				}));
+				
+				return createJsonResponseRaw(result);
 			}
 
+			// 記事の取得
 			if (pathname === "/get") {
-				const page = url.searchParams.get("page");
-				if (!page) {
-					return createJsonResponse(400, "Bad Request", { error: "path parameter is required" });
-				}
+				let page = url.searchParams.get("page");
+				if (!page) return createJsonResponse(400, "Bad Request", { error: "path parameter is required" });
+
+				page = `${page}.md`;
 
 				const res = await getPost(page, env.GITHUB_TOKEN);
+				const data: any = await res.json();
 
-				const data = await res.json();
-				return createJsonResponse(res.status, res.statusText, data);
+				let content = data.content;
+				if (data.encoding && data.encoding === "base64")
+					content = base642txt(data.content);
+
+				return createJsonResponseRaw({
+					name: data.name.replace(".md", ""),
+					sha: data.sha,
+					size: data.size,
+					content: content
+				});
 			}
 
+			// 認証テスト
+			if (pathname === "/test") {
+				const token = request.headers.get("Authorization");
+				if (!token) {
+					return createJsonResponse(401, "Unauthorized", { error: "Authorization header is required" });					
+				}
+
+				if (token.replace("Bearer ", "") !== env.AUTH_TOKEN) {
+					return createJsonResponse(403, "Forbidden", { error: "Invalid authorization token" });
+				}
+
+				return createJsonResponseRaw({ message: "Authorized" });
+			}
+
+			// 認証してトークンを発行して返す
+			if (pathname === "/auth") {
+				const authHeader = request.headers.get("Authorization");
+				let user_id: string | null = null;
+				let hashed_pass: string | null = null;
+
+				if (authHeader && authHeader.startsWith("Basic ")) {
+					const base64Credentials = authHeader.replace("Basic ", "");
+					const credentials = atob(base64Credentials);
+					const [user, pass] = credentials.split(":");
+					user_id = user;
+					hashed_pass = pass;
+				} else {
+					user_id = url.searchParams.get("user");
+					hashed_pass = url.searchParams.get("pass");
+				}
+				
+				if (!user_id || !hashed_pass) {
+					return createJsonResponse(400, "Bad Request", { error: "user and pass are required" });
+				}
+
+				// sha256
+				if (user_id === "admin" && hashed_pass === "0fba3f80850c2414b60b26ed085183d25b906d6a65db4929e3af0f997894a761") {
+					return createJsonResponseRaw({ token: env.AUTH_TOKEN });
+				} else {
+					return createJsonResponse(403, "Forbidden", { error: "Invalid user or pass (sha256)" });
+				}
+			}
+
+			// 記事の更新、作成
 			if (pathname === "/update") {
-				return createJsonResponse(500, "Internal Server Error", { error: "現在、利用できません。" });
+				const token = request.headers.get("Authorization");
+				if (!token) {
+					return createJsonResponse(401, "Unauthorized", { error: "Authorization header is required" });					
+				}
+
+				if (token.replace("Bearer ", "") !== env.AUTH_TOKEN) {
+					return createJsonResponse(403, "Forbidden", { error: "Invalid authorization token" });
+				}
+
+				//return createJsonResponse(500, "Internal Server Error", { error: "現在、利用できません。" });
 
 				if (request.method !== "POST") {
 					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
 				}
 
-				const reqBody = await request.json() as { path: string; content: string; message: string };
-				const { path, content, message } = reqBody;
-				if (!path || !content || !message) {
-					return createJsonResponse(400, "Bad Request", { error: "path, content, and message are required" });
+				// page、content POSTを受け取って記事更新するコードは以下に置いておく
+				const page = request.headers.get("page");
+				const content = request.headers.get("content");
+				if (!page || !content) {
+					return createJsonResponse(400, "Bad Request", { error: "page and content headers are required" });
 				}
-				
-				const res = await updatePost(path, content, message, env.GITHUB_TOKEN);
-				const data = await res.json();
+
+				const res = await updatePost(`${page}.md`, content as string, "Update post via Cloudflare Worker", env.GITHUB_TOKEN);
+				const data: any = await res.json();
+
 				return createJsonResponse(res.status, res.statusText, data);
 			}
 			
