@@ -28,43 +28,122 @@ function requestGitHub(url: string, method: string, token: string, body?: any) {
 	});
 }
 
-function getListPosts(token: string) {
-	const url = `https://api.github.com/repos/osu-denken/blog/contents/_posts`;
-	return requestGitHub(url, "GET", token);
+function getList(token: string) {
+	try {
+		const url = `https://api.github.com/repos/osu-denken/blog/contents/_posts`;
+		return requestGitHub(url, "GET", token);
+	} catch (e) {
+		return Promise.reject(e);
+	}
 }
 
 function getPost(path: string, token: string) {
-	const url = `https://api.github.com/repos/osu-denken/blog/contents/${path}`;
-	return requestGitHub(url, "GET", token);
+	try {
+		const url = `https://api.github.com/repos/osu-denken/blog/contents/_posts/${path}`;
+		return requestGitHub(url, "GET", token);
+	} catch (e) {
+		return Promise.reject(e);
+	}
 }
 
 async function updatePost(path: string, content: string, message: string, token: string, sha?: string) {
-	const url = `https://api.github.com/repos/osu-denken/blog/contents/${path}`;
-	const body: { message: string; content: string; branch: string; sha?: string } = {
-		message,
-		content,
-		branch: BRANCH
-	};
-	
-	if (sha) {
-		body.sha = sha;
-	} else {
-		const req = await requestGitHub(url, "GET", token);
-		if (req.status === 200) {
-			const data = await req.json() as { sha: string };
-			body.sha = data.sha;
+	try {
+		const url = `https://api.github.com/repos/osu-denken/blog/contents/${path}`;
+		const body: { message: string; content: string; branch: string; sha?: string } = {
+			message,
+			content,
+			branch: BRANCH
+		};
+		
+		if (sha) {
+			body.sha = sha;
+		} else {
+			const req = await requestGitHub(url, "GET", token);
+			if (req.status === 200) {
+				const data = await req.json() as { sha: string };
+				body.sha = data.sha;
+			}
 		}
-	}
 
-	return requestGitHub(url, "PUT", token, body);
+		return requestGitHub(url, "PUT", token, body);
+	} catch (e) {
+		return Promise.reject(e);
+	}
+}
+
+function createJsonResponse(status: number, statusText: string, body: any) {
+	return new Response(
+		JSON.stringify(
+			{
+				status,
+				statusText,
+				body
+			}, null, 2
+		),
+		{ 
+			status, 
+			headers: {
+				"Content-Type": "application/json" 
+			} 
+		}
+	);
 }
 
 export default {
 	async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
 		if (!env.GITHUB_TOKEN) return new Response("GITHUB_TOKEN is not set", { status: 500 });
+		// REST API style
+		// api.osudenken4dev.workers.dev/list
+		// api.osudenken4dev.workers.dev/get?id=xxxx.md
+		// api.osudenken4dev.workers.dev/update
+
+		const url = new URL(request.url);
+		const pathname: string = url.pathname;
+
+		try {
+			if (pathname === "/list") {
+				const res = await getList(env.GITHUB_TOKEN);
+
+				const data = await res.json();
+				return createJsonResponse(res.status, res.statusText, data);
+			}
+
+			if (pathname === "/get") {
+				const page = url.searchParams.get("page");
+				if (!page) {
+					return createJsonResponse(400, "Bad Request", { error: "path parameter is required" });
+				}
+
+				const res = await getPost(page, env.GITHUB_TOKEN);
+
+				const data = await res.json();
+				return createJsonResponse(res.status, res.statusText, data);
+			}
+
+			if (pathname === "/update") {
+				return createJsonResponse(500, "Internal Server Error", { error: "現在、利用できません。" });
+
+				if (request.method !== "POST") {
+					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
+				}
+
+				const reqBody = await request.json() as { path: string; content: string; message: string };
+				const { path, content, message } = reqBody;
+				if (!path || !content || !message) {
+					return createJsonResponse(400, "Bad Request", { error: "path, content, and message are required" });
+				}
+				
+				const res = await updatePost(path, content, message, env.GITHUB_TOKEN);
+				const data = await res.json();
+				return createJsonResponse(res.status, res.statusText, data);
+			}
+			
+		} catch (e: any) {
+			return createJsonResponse(500, "Internal Server Error", { error: e.toString() });
+		}
+
 
 		const path = `_posts/test.md`;
-		const url = `https://api.github.com/repos/` + OWNER + `/` + REPO + `/contents/${path}`;
 
 		let text = `# hogehoge\n\n`;
 
