@@ -13,8 +13,10 @@ const BRANCH = "main";
 export interface Env {
 	GITHUB_TOKEN: string;
 	AUTH_TOKEN: string;
+	FIREBASE_API_KEY: string;
 }
 
+// blog api
 function requestGitHub(url: string, method: string, token: string, body?: any) {
 	const headers: Record<string, string> = {
 		"Authorization": `token ${token}`,
@@ -71,6 +73,54 @@ async function updatePost(path: string, content: string, message: string, token:
 	}
 }
 
+// user api
+async function registerUser(env: Env, email: string, password: string) {
+	const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${env.FIREBASE_API_KEY}`, {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json"
+		},
+		body: JSON.stringify({
+			email,
+			password,
+			returnSecureToken: true
+		})
+	});
+	const data = await res.json();
+	return data;
+}
+
+async function loginUser(env: Env, email: string, password: string) {
+	const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${env.FIREBASE_API_KEY}`, {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json"
+		},
+		body: JSON.stringify({
+			email,
+			password,
+			returnSecureToken: true
+		})
+	});
+	const data = await res.json();
+	return data;
+}
+
+async function resetPassword(env: Env, email: string) {
+	const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${env.FIREBASE_API_KEY}`, {
+		method: "POST",
+		headers: {
+			"Content-Type": "application/json"
+		},
+		body: JSON.stringify({
+			requestType: "PASSWORD_RESET",
+			email
+		})
+	});
+	const data = await res.json();
+	return data;
+}
+
 export default {
 	async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
 		if (!env.GITHUB_TOKEN) return new Response("GITHUB_TOKEN is not set", { status: 500 });
@@ -95,8 +145,43 @@ export default {
 				return new Response("pong", { status: 200 });
 			}
 
+			// user api
+			if (pathname === "/user/register") {
+				if (request.method !== "POST") {
+					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
+				}
+
+				const { email, password } = await request.json() as { email: string; password: string };
+				if (!email || !password) {
+					return createJsonResponse(400, "Bad Request", { error: "email and password are required" });
+				}
+
+				if (!email.match(/@(.+?)\.osaka-sandai\.ac\.jp$/)) {
+					return createJsonResponse(400, "Bad Request", { error: "Email must be from osaka-sandai.ac.jp domain" });
+				}
+
+				const data = await registerUser(env, email, password);
+				return createJsonResponseRaw(data);
+			}
+
+			if (pathname === "/user/login") {
+				if (request.method !== "POST") {
+					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
+				}
+
+				const { email, password } = await request.json() as { email: string; password: string };
+				if (!email || !password) {
+					return createJsonResponse(400, "Bad Request", { error: "email and password are required" });
+				}
+
+				const data = await loginUser(env, email, password);
+				return createJsonResponseRaw(data);
+			}
+
+			// blog api
+
 			// 記事一覧の取得
-			if (pathname === "/list") {
+			if (pathname === "/blog/list") {
 				const res = await getList(env.GITHUB_TOKEN);
 				const data: any = await res.json();
 
@@ -110,7 +195,7 @@ export default {
 			}
 
 			// 記事の取得
-			if (pathname === "/get") {
+			if (pathname === "/blog/get") {
 				let page = url.searchParams.get("page");
 				if (!page) return createJsonResponse(400, "Bad Request", { error: "path parameter is required" });
 
@@ -147,36 +232,25 @@ export default {
 
 			// 認証してトークンを発行して返す
 			if (pathname === "/auth") {
-				const authHeader = request.headers.get("Authorization");
-				let user_id: string | null = null;
-				let hashed_pass: string | null = null; // sha256されたパスワード
+				if (request.method !== "POST") {
+					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
+				}
 
-				if (authHeader && authHeader.startsWith("Basic ")) {
-					const base64Credentials = authHeader.replace("Basic ", "");
-					const credentials = atob(base64Credentials);
-					const [user, pass] = credentials.split(":");
-					user_id = user;
-					hashed_pass = pass;
-				} else {
-					user_id = url.searchParams.get("user");
-					hashed_pass = url.searchParams.get("pass");
+				const { email, password } = await request.json() as { email: string; password: string };
+				if (!email || !password) {
+					return createJsonResponse(400, "Bad Request", { error: "email and password are required" });
 				}
 				
-				if (!user_id || !hashed_pass) {
-					return createJsonResponse(400, "Bad Request", { error: "user and pass (sha256) are required" });
-				}
-
-				// sha256
-				const hashed_hashed_pass = await sha256(hashed_pass);
-				if (user_id === "admin" && hashed_hashed_pass === "3eaff5f1080be960f83978f99acce9a19ed2f0a0d197f7a816fadec50d9d1286") {
-					return createJsonResponseRaw({ token: env.AUTH_TOKEN });
+				const data = await loginUser(env, email, password) as any;
+				if (data.idToken) {
+			        return createJsonResponseRaw({ token: env.AUTH_TOKEN });
 				} else {
-					return createJsonResponse(403, "Forbidden", { error: "Invalid user or pass (sha256)" });
+					return createJsonResponse(403, "Forbidden", { error: "Invalid email or password" });
 				}
 			}
 
 			// 記事の更新、作成
-			if (pathname === "/update") {
+			if (pathname === "/blog/update") {
 				const token = request.headers.get("Authorization");
 
 				// トークン認証

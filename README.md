@@ -29,11 +29,17 @@ APIの稼働確認を行う。
 /ping
 ```
 
+# OSU-DENKEN User API
+
+
+
+# OSU-DENKEN Blog API
+
 ## ページ一覧
 それぞれのページ名、ハッシュ値、ファイルサイズの一覧を取得する。
 
 ```bash
-/list
+/blog/list
 ```
 
 ### 構造
@@ -50,7 +56,7 @@ APIの稼働確認を行う。
 
 ## ページの取得
 ```bash
-/get?page=<ページ名>
+/blog/get?page=<ページ名>
 ```
 
 ### 構造
@@ -67,7 +73,7 @@ APIの稼働確認を行う。
 POSTメソッドでトークンと一緒にページ名、内容を送信してページを更新する。
 
 ```bash
-/update
+/blog/update
 ```
 
 ### ヘッダ
@@ -86,4 +92,4 @@ page: ページ名
 ## シークレットキーについて
 - GITHUB_TOKEN - GitHub APIトークン
 - AUTH_TOKEN - OSU DENKEN APIトークン
-
+- FIREBASE_API_KEY - Firebase APIキー
