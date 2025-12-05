@@ -1,4 +1,4 @@
-function txt2base64(str: string) {
+export function txt2base64(str: string) {
 	const bytes = new TextEncoder().encode(str);
 	let binary = '';
 	for (let i = 0; i < bytes.length; i++) {
@@ -7,7 +7,7 @@ function txt2base64(str: string) {
 	return btoa(binary);
 }
 
-function base642txt(base64: string) {
+export function base642txt(base64: string) {
     const decodedContent = atob(base64);
     const bytes = new Uint8Array(decodedContent.length);
     for (let i = 0; i < decodedContent.length; i++) {
@@ -16,7 +16,7 @@ function base642txt(base64: string) {
     return new TextDecoder().decode(bytes);
 }
 
-function createJsonResponse(status: number, statusText: string, body: any) {
+export function createJsonResponse(status: number, statusText: string, body: any) {
 	return new Response(
 		JSON.stringify(
 			{
@@ -34,7 +34,7 @@ function createJsonResponse(status: number, statusText: string, body: any) {
 	);
 }
 
-function createJsonResponseRaw(data: any) {
+export function createJsonResponseRaw(data: any) {
     return new Response(JSON.stringify(data, null, 2), {
         status: 200,
         headers: {

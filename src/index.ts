@@ -1,4 +1,9 @@
-import "./util.ts";
+import { 
+  txt2base64,
+  base642txt,
+  createJsonResponse,
+  createJsonResponseRaw
+} from "./util";
 
 const OWNER = "osu-denken";
 const REPO = "blog";
