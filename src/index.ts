@@ -169,9 +169,15 @@ export default {
 					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
 				}
 
-				const { email, password } = await request.json() as { email: string; password: string };
+				let { email, password } = await request.json() as { email: string; password: string };
 				if (!email || !password) {
 					return createJsonResponse(400, "Bad Request", { error: "email and password are required" });
+				}
+
+				if (!email.includes("@")) email = `${email}@ge.osaka-sandai.ac.jp`;
+
+				if (env.AUTH_TOKEN === "") {
+					return createJsonResponse(500, "Internal Server Error", { error: "AUTH_TOKEN is not set" });
 				}
 
 				const data = await loginUser(env, email, password);
