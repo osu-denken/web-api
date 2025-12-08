@@ -239,6 +239,11 @@ export default {
 				return createJsonResponseRaw(data);
 			}
 
+			// TODO: ユーザー情報、メールアドレスやディスプレイネーム、作成日時といった情報
+			if (pathname === "/user/info") {
+
+			}
+
 			// blog api
 
 			// 記事一覧の取得
