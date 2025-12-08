@@ -160,7 +160,9 @@ export default {
 					return createJsonResponse(400, "Bad Request", { error: "Email must be from osaka-sandai.ac.jp domain" });
 				}
 
-				const data = await registerUser(env, email, password);
+				const data: any = await registerUser(env, email, password);
+				data.success = true;
+
 				return createJsonResponseRaw(data);
 			}
 
@@ -180,7 +182,9 @@ export default {
 					return createJsonResponse(500, "Internal Server Error", { error: "AUTH_TOKEN is not set" });
 				}
 
-				const data = await loginUser(env, email, password);
+				const data: any = await loginUser(env, email, password);
+				data.success = true;
+
 				return createJsonResponseRaw(data);
 			}
 
@@ -218,7 +222,8 @@ export default {
 					},
 					body: JSON.stringify(body)
 				});
-				const data = await res.json();
+				const data: any = await res.json();
+				data.success = true;
 
 				return createJsonResponseRaw(data);
 			}
@@ -233,7 +238,8 @@ export default {
 					return createJsonResponse(400, "Bad Request", { error: "email is required" });
 				}
 
-				const data = await resetPassword(env, email);
+				const data: any = await resetPassword(env, email);
+				data.success = true;
 
 				return createJsonResponseRaw(data);
 			}
@@ -308,7 +314,7 @@ export default {
 				
 				const data = await loginUser(env, email, password) as any;
 				if (data.idToken) {
-			        return createJsonResponseRaw({ token: env.AUTH_TOKEN });
+			        return createJsonResponseRaw({ token: env.AUTH_TOKEN, success: true });
 				} else {
 					return createJsonResponse(403, "Forbidden", { error: "Invalid email or password" });
 				}
@@ -335,6 +341,7 @@ export default {
 
 				const res = await updatePost(`${page}.md`, content as string, "Update post via Cloudflare Worker", env.GITHUB_TOKEN);
 				const data: any = await res.json();
+				data.success = true;
 
 				return createJsonResponse(res.status, res.statusText, data);
 			}
