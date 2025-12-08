@@ -200,17 +200,16 @@ export default {
 					returnSecureToken: true
 				};
 
+				const json: any = await request.json();
+
 				// ディスプレイ名
-				const { name } = await request.json() as { name?: string };
-				if (name) body.displayName = name;
+				if (json.name) body.displayName = json.name;
 
 				// プロフィール画像
-				const { photoUrl } = await request.json() as { photoUrl?: string };
-				if (photoUrl) body.photoUrl = photoUrl;
+				if (json.photoUrl) body.photoUrl = json.photoUrl;
 
 				// メールアドレス
-				const { email } = await request.json() as { email?: string };
-				if (email) body.email = email;
+				if (json.email) body.email = json.email;
 
 				const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${env.FIREBASE_API_KEY}`, {
 					method: "POST",
