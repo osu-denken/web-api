@@ -184,6 +184,50 @@ export default {
 				return createJsonResponseRaw(data);
 			}
 
+			if (pathname === "/user/update") { // 設定などの更新
+				if (request.method !== "POST") {
+					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
+				}
+
+				let idToken = request.headers.get("Authorization");
+				if (!idToken) {
+					return createJsonResponse(401, "Unauthorized", { error: "Authorization header is required" });
+				}
+				idToken = idToken.replace("Bearer ", "");
+
+				const body: any = {
+					idToken,
+					returnSecureToken: true
+				};
+
+				// ディスプレイ名
+				const { name } = await request.json() as { name?: string };
+				if (name) body.displayName = name;
+
+				// パスワード
+				const { password } = await request.json() as { password?: string };
+				if (password) body.password = password;
+
+				// プロフィール画像
+				const { photoUrl } = await request.json() as { photoUrl?: string };
+				if (photoUrl) body.photoUrl = photoUrl;
+
+				// メールアドレス
+				const { email } = await request.json() as { email?: string };
+				if (email) body.email = email;
+
+				const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${env.FIREBASE_API_KEY}`, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify(body)
+				});
+				const data = await res.json();
+
+				return createJsonResponseRaw(data);
+			}
+
 			// blog api
 
 			// 記事一覧の取得
