@@ -204,10 +204,6 @@ export default {
 				const { name } = await request.json() as { name?: string };
 				if (name) body.displayName = name;
 
-				// パスワード
-				const { password } = await request.json() as { password?: string };
-				if (password) body.password = password;
-
 				// プロフィール画像
 				const { photoUrl } = await request.json() as { photoUrl?: string };
 				if (photoUrl) body.photoUrl = photoUrl;
@@ -224,6 +220,21 @@ export default {
 					body: JSON.stringify(body)
 				});
 				const data = await res.json();
+
+				return createJsonResponseRaw(data);
+			}
+
+			if (pathname === "/user/resetPassword") {
+				if (request.method !== "POST") {
+					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
+				}
+				
+				const { email } = await request.json() as { email?: string };
+				if (!email) {
+					return createJsonResponse(400, "Bad Request", { error: "email is required" });
+				}
+
+				const data = await resetPassword(env, email);
 
 				return createJsonResponseRaw(data);
 			}
