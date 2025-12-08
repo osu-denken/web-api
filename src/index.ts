@@ -157,7 +157,7 @@ async function verifyIdToken(env: Env, idToken: string) {
 	const data: any = await res.json();
 
 	if (!res.ok || !data.users || data.users.length === 0) {
-		return null; // 無効
+		return data; // 無効
 	}
 
 	return data.users[0]; // ユーザー情報
@@ -421,7 +421,7 @@ export default {
 
 				const data: any = await verifyIdToken(env, idToken);
 
-				if (!data) {
+				if ((!data.users || data.users.length === 0)) {
 					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
 				}
 
