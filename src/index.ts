@@ -422,7 +422,7 @@ export default {
 				const data: any = await verifyIdToken(env, idToken);
 
 				if ((!data.users || data.users.length === 0)) {
-					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
+					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken", data: data });
 				}
 
 				return createJsonResponseRaw({ code: env.DISCORD_INVITE, success: true });
