@@ -14,6 +14,7 @@ export interface Env {
 	GITHUB_TOKEN: string;
 	AUTH_TOKEN: string;
 	FIREBASE_API_KEY: string;
+	DISCORD_INVITE: string;
 }
 
 // blog api
@@ -29,6 +30,28 @@ function requestGitHub(url: string, method: string, token: string, body?: any) {
 		body: body ? JSON.stringify(body) : undefined
 	});
 }
+
+// invite github organization
+async function inviteGitHubOrganization(env: Env, email: string) {
+	const url = `https://api.github.com/orgs/${OWNER}/invitations`;
+
+	const res = await fetch(url, {
+		method: "POST",
+		headers: {
+			"Authorization": `token ${env.GITHUB_TOKEN}`,
+			"Content-Type": "application/json",
+			"Accept": "application/vnd.github+json",
+			"User-Agent": "osu-denken-admin-cloudflare-worker"
+		},
+		body: JSON.stringify({
+			email,
+			role: "direct_member"
+		})
+	});
+
+	return res;
+}
+
 
 function getList(token: string) {
 	try {
@@ -120,6 +143,26 @@ async function resetPassword(env: Env, email: string) {
 	const data = await res.json();
 	return data;
 }
+
+async function verifyIdToken(env: Env, idToken: string) {
+	const res = await fetch(
+		`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${env.FIREBASE_API_KEY}`,
+		{
+			method: "POST",
+			headers: { "Content-Type": "application/json" },
+			body: JSON.stringify({ idToken })
+		}
+	);
+
+	const data: any = await res.json();
+
+	if (!res.ok || !data.users || data.users.length === 0) {
+		return null; // 無効
+	}
+
+	return data.users[0]; // ユーザー情報
+}
+
 
 export default {
 	async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
@@ -246,7 +289,25 @@ export default {
 
 			// TODO: ユーザー情報、メールアドレスやディスプレイネーム、作成日時といった情報
 			if (pathname === "/user/info") {
+				if (request.method !== "POST") {
+					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
+				}
 
+				let idToken = request.headers.get("Authorization");
+				if (!idToken) {
+					return createJsonResponse(401, "Unauthorized", { error: "Authorization header is required" });
+				}
+				idToken = idToken.replace("Bearer ", "");
+
+				const data: any = await verifyIdToken(env, idToken);
+
+				if (!data) {
+					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
+				}
+
+				data.success = true;
+
+				return createJsonResponseRaw(data);
 			}
 
 			// blog api
@@ -345,6 +406,68 @@ export default {
 
 				return createJsonResponse(res.status, res.statusText, data);
 			}
+
+			// discord
+			if (pathname === "/discord/invite") {
+				if (request.method !== "POST") {
+					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
+				}
+
+				let idToken = request.headers.get("Authorization");
+				if (!idToken) {
+					return createJsonResponse(401, "Unauthorized", { error: "Authorization header is required" });
+				}
+				idToken = idToken.replace("Bearer ", "");
+
+				const data: any = await verifyIdToken(env, idToken);
+
+				if (!data) {
+					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
+				}
+
+				return createJsonResponseRaw({ code: env.DISCORD_INVITE, success: true });
+			}
+
+			// GitHub Organization
+			if (pathname === "/github/invite") {
+				if (request.method !== "POST") {
+					return createJsonResponse(405, "Method Not Allowed", {
+						error: "Only POST method is allowed"
+					});
+				}
+
+				let idToken = request.headers.get("Authorization");
+				if (!idToken) {
+					return createJsonResponse(401, "Unauthorized", { error: "Authorization header is required" });
+				}
+				idToken = idToken.replace("Bearer ", "");
+
+				const data: any = await verifyIdToken(env, idToken);
+
+				if (!data) {
+					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
+				}
+
+				const { email } = await request.json() as { email: string };
+				if (!email) {
+					return createJsonResponse(400, "Bad Request", { error: "email is required" });
+				}
+
+				const res = await inviteGitHubOrganization(env, email);
+				const data2: any = await res.json();
+
+				if (!res.ok) {
+					return createJsonResponse(res.status, res.statusText, {
+						error: data2.message || "GitHub invite failed"
+					});
+				}
+
+				return createJsonResponseRaw({
+					success: true,
+					invited: email
+				});
+			}
+
 			
 		} catch (e: any) {
 			return createJsonResponse(500, "Internal Server Error", { error: e.toString() });

@@ -90,6 +90,12 @@ page: ページ名
 ```
 
 ## シークレットキーについて
-- GITHUB_TOKEN - GitHub APIトークン
+- GITHUB_TOKEN - GitHub APIトークン (repoとadmin:orgが必要)
 - AUTH_TOKEN - OSU DENKEN APIトークン
 - FIREBASE_API_KEY - Firebase APIキー
+- DISCORD_INVITE - Discord招待コード
+
+### シークレットの追加
+`npx wrangler secret put キー名`を入力して実行し、その後、値を入力する。
+<br />
+削除は `npx wrangler secret delete キー名` を実行する。
