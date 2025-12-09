@@ -250,7 +250,7 @@ export default {
 				const json: any = await request.json();
 
 				// ディスプレイ名
-				if (json.name) body.displayName = json.name;
+				if (json.displayName) body.displayName = json.displayName;
 
 				// プロフィール画像
 				if (json.photoUrl) body.photoUrl = json.photoUrl;
