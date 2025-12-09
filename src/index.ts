@@ -15,6 +15,7 @@ export interface Env {
 	AUTH_TOKEN: string;
 	FIREBASE_API_KEY: string;
 	DISCORD_INVITE: string;
+	REGISTER_PASSPHRASE: string;
 }
 
 // blog api
@@ -194,14 +195,22 @@ export default {
 					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
 				}
 
-				const { email, password } = await request.json() as { email: string; password: string };
+				let { email, password, passphrase } = await request.json() as { email: string; password: string, passphrase: string };
+
+				if (passphrase !== env.REGISTER_PASSPHRASE) {
+					return createJsonResponse(403, "Forbidden", { error: "Invalid passphrase" });
+				}
+				
 				if (!email || !password) {
 					return createJsonResponse(400, "Bad Request", { error: "email and password are required" });
 				}
 
+				if (!email.includes("@")) email += `@ge.osaka-sandai.ac.jp`;
+
 				if (!email.match(/@(.+?)\.osaka-sandai\.ac\.jp$/)) {
 					return createJsonResponse(400, "Bad Request", { error: "Email must be from osaka-sandai.ac.jp domain" });
 				}
+				
 
 				const data: any = await registerUser(env, email, password);
 				data.success = true;
