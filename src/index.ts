@@ -326,6 +326,14 @@ export default {
 
 				if (!verifyData) return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
 
+				if (verifyData.disabled) {
+					return createJsonResponse(403, "Forbidden", { error: "User account is disabled" });
+				}
+
+				if (verifyData.error.message === "INVALID_ID_TOKEN") {
+					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
+				}
+
 				return createJsonResponseRaw({
 					success: true,
 					user: verifyData,
