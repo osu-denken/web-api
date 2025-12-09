@@ -1,4 +1,6 @@
 # OSU-DENKEN API
+- https://osu-denken.github.io/debug/
+
 ## ユーザ認証
 Basic認証もしくはGETパラメータで認証を行い、トークンを返す。<br />
 パスワードにはSHA-256でハッシュ化した値をセットする。
