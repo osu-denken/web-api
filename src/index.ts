@@ -305,6 +305,14 @@ export default {
 					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
 				}
 
+				if (data.disabled) {
+					return createJsonResponse(403, "Forbidden", { error: "User account is disabled" });
+				}
+
+				if (data.error.message === "INVALID_ID_TOKEN") {
+					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
+				}
+
 				data.success = true;
 
 				return createJsonResponseRaw(data);
@@ -454,6 +462,10 @@ export default {
 				idToken = idToken.replace("Bearer ", "");
 
 				const data: any = await verifyIdToken(env, idToken);
+
+				if (data.disabled) {
+					return createJsonResponse(403, "Forbidden", { error: "User account is disabled" });
+				}
 
 				if ((data.error || !data.localId)) {
 					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken", data: data });
