@@ -309,7 +309,7 @@ export default {
 					return createJsonResponse(403, "Forbidden", { error: "User account is disabled" });
 				}
 
-				if (data.error.message === "INVALID_ID_TOKEN") {
+				if (data.error && data.error.message === "INVALID_ID_TOKEN") {
 					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
 				}
 
@@ -338,7 +338,7 @@ export default {
 					return createJsonResponse(403, "Forbidden", { error: "User account is disabled" });
 				}
 
-				if (verifyData.error.message === "INVALID_ID_TOKEN") {
+				if (verifyData.error && verifyData.error.message === "INVALID_ID_TOKEN") {
 					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
 				}
 
