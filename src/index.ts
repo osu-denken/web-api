@@ -421,7 +421,7 @@ export default {
 
 				const data: any = await verifyIdToken(env, idToken);
 
-				if ((!data.users || data.users.length === 0)) {
+				if ((data.error || !data.localId)) {
 					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken", data: data });
 				}
 
