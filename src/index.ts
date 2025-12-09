@@ -287,7 +287,7 @@ export default {
 				return createJsonResponseRaw(data);
 			}
 
-			// TODO: ユーザー情報、メールアドレスやディスプレイネーム、作成日時といった情報
+			// ユーザー情報、メールアドレスやディスプレイネーム、作成日時といった情報
 			if (pathname === "/user/info") {
 				if (request.method !== "POST") {
 					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
@@ -308,6 +308,32 @@ export default {
 				data.success = true;
 
 				return createJsonResponseRaw(data);
+			}
+
+			// 部員ポータル用にまとめた情報を返す
+			if (pathname === "/portal") {
+				if (request.method !== "POST") {
+					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
+				}
+
+				let idToken = request.headers.get("Authorization");
+				if (!idToken) {
+					return createJsonResponse(401, "Unauthorized", { error: "Authorization header is required" });
+				}
+				idToken = idToken.replace("Bearer ", "");
+
+				const verifyData: any = await verifyIdToken(env, idToken);
+
+				if (!verifyData) return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
+
+				return createJsonResponseRaw({
+					success: true,
+					user: verifyData,
+					limits: {
+						discordInviteCode: env.DISCORD_INVITE,
+					},
+					idToken: idToken
+				});
 			}
 
 			// blog api
