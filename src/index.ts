@@ -380,7 +380,7 @@ export default {
 			// 記事の取得
 			if (pathname === "/blog/get") {
 				let page = url.searchParams.get("page");
-				if (!page) return createJsonResponse(400, "Bad Request", { error: "path parameter is required" });
+				if (!page) return createJsonResponse(400, "Bad Request", { error: "page parameter is required" });
 
 				page = `${page}.md`;
 
