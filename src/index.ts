@@ -77,7 +77,7 @@ async function updatePost(path: string, content: string, message: string, token:
 		const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts/${path}`;
 		const body: { message: string; content: string; branch: string; sha?: string } = {
 			message,
-			content,
+			content: btoa(content),
 			branch: BRANCH
 		};
 		
