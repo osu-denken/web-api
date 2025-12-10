@@ -465,11 +465,11 @@ export default {
 				}
 
 				const res = await updatePost(`${page}.md`, content as string, "Update post via Cloudflare Worker", env.GITHUB_TOKEN);
-				const data: any = await res.json();
+				const data2: any = await res.json();
 
-				data.success = true;
+				data2.success = true;
 				
-				return createJsonResponse(res.status, res.statusText, data);
+				return createJsonResponse(res.status, res.statusText, data2);
 			}
 
 			// discord
