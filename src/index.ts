@@ -469,7 +469,7 @@ export default {
 
 				data2.success = true;
 				
-				return createJsonResponse(res.status, res.statusText, data2);
+				return createJsonResponseRaw({data2});
 			}
 
 			// discord
