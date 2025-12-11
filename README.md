@@ -97,6 +97,7 @@ page: ページ名
 - FIREBASE_API_KEY - Firebase APIキー
 - DISCORD_INVITE - Discord招待コード
 - REGISTER_PASSPHRASE - 登録の合言葉
+- GOOGLE_DRIVE_TOKEN - Google Drive APIトークン
 
 ### シークレットの追加
 `npx wrangler secret put キー名`を入力して実行し、その後、値を入力する。

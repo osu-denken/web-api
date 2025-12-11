@@ -16,6 +16,7 @@ export interface Env {
 	FIREBASE_API_KEY: string;
 	DISCORD_INVITE: string;
 	REGISTER_PASSPHRASE: string;
+	GOOGLE_DRIVE_TOKEN: string;
 }
 
 // blog api
@@ -31,6 +32,18 @@ function requestGitHub(url: string, method: string, token: string, body?: any) {
 		body: body ? JSON.stringify(body) : undefined
 	});
 }
+
+async function getFileFromDrive(env: Env, fileId: string) {
+  const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
+    headers: {
+      "Authorization": `Bearer ${env.GOOGLE_DRIVE_TOKEN}`
+    }
+  });
+
+  if (!res.ok) throw new Error("Failed to fetch file");
+  return await res.text();
+}
+
 
 // invite github organization
 async function inviteGitHubOrganization(env: Env, email: string) {
