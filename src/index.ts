@@ -1,3 +1,5 @@
+import matter from "gray-matter";
+
 import { 
   txt2base64,
   base642txt,
@@ -425,38 +427,14 @@ export default {
 				if (data.encoding && data.encoding === "base64")
 					content = base642txt(data.content);
 
-				// メタ情報の抽出
-				const meta: Record<string, any> = {};
-				let body = content;
-				if (content.startsWith("---")) {
-					const endIndex = content.indexOf("---", 3);
-					if (endIndex !== -1) {
-						const metaString = content.substring(3, endIndex).trim();
-						body = content.substring(endIndex + 3).trim();
-
-						const lines = metaString.split("\n");
-						for (const line of lines) {
-							const [key, ...rest] = line.split(":");
-							if (key && rest !== undefined) {
-								const value: any = rest.trim();
-								// 配列の処理
-								if (value.startsWith("[") && value.endsWith("]")) {
-									const arrayValues = value.substring(1, value.length - 1).split(",").map(v => v.trim());
-									meta[key.trim()] = arrayValues;
-								} else {
-									meta[key.trim()] = value;
-								}
-							}
-						}
-					}
-				}
+				const parsed = matter(content);
 
 				return createJsonResponseRaw({
 					name: data.name.replace(".md", ""),
 					sha: data.sha,
 					size: data.size,
-					meta,
-					content: body
+					meta: parsed.data,
+					content: parsed.content
 				});
 
 			}
