@@ -230,7 +230,12 @@ export default {
 				if (!email.match(/@(.+?)\.osaka-sandai\.ac\.jp$/)) {
 					return createJsonResponse(400, "Bad Request", { error: "Email must be from osaka-sandai.ac.jp domain" });
 				}
-				
+
+				// すべて小文字にし、先頭にsがなければsを追加する。
+				email = email.toLowerCase();
+				if (!email.startsWith("s")) {
+					email = `s` + email;
+				}				
 
 				const data: any = await registerUser(env, email, password);
 				data.success = true;
@@ -252,6 +257,12 @@ export default {
 
 				if (env.AUTH_TOKEN === "") {
 					return createJsonResponse(500, "Internal Server Error", { error: "AUTH_TOKEN is not set" });
+				}
+				
+				// すべて小文字にし、先頭にsがなければsを追加する。
+				email = email.toLowerCase();
+				if (!email.startsWith("s")) {
+					email = `s` + email;
 				}
 
 				const data: any = await loginUser(env, email, password);
