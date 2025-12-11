@@ -403,6 +403,10 @@ export default {
 				const res = await getPost(page, env.GITHUB_TOKEN);
 				const data: any = await res.json();
 
+				if (!data.content) {
+					return createJsonResponse(404, "Not Found", { error: "Post not found", data });
+				}
+
 				let content = data.content;
 				if (data.encoding && data.encoding === "base64")
 					content = base642txt(data.content);
@@ -423,6 +427,10 @@ export default {
 
 				const res = await getPost(page, env.GITHUB_TOKEN);
 				const data: any = await res.json();
+
+				if (!data.content) {
+					return createJsonResponse(404, "Not Found", { error: "Post not found", data });
+				}
 
 				let content = data.content;
 				if (data.encoding && data.encoding === "base64")
