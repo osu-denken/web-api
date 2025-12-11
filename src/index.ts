@@ -438,7 +438,7 @@ export default {
 						for (const line of lines) {
 							const [key, ...rest] = line.split(":");
 							if (key && rest !== undefined) {
-								const value = rest.trim();
+								const value: any = rest.trim();
 								// 配列の処理
 								if (value.startsWith("[") && value.endsWith("]")) {
 									const arrayValues = value.substring(1, value.length - 1).split(",").map(v => v.trim());
