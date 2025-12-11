@@ -90,7 +90,7 @@ async function updatePost(path: string, content: string, message: string, token:
 		const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts/${path}`;
 		const body: { message: string; content: string; branch: string; sha?: string } = {
 			message,
-			content,
+			content: btoa(content),
 			branch: BRANCH
 		};
 		
@@ -189,7 +189,7 @@ export default {
 			return new Response(null, { status: 204, headers: {
 				"Access-Control-Allow-Origin": "*",
 				"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
-				"Access-Control-Allow-Headers": "Content-Type, Authorization",
+				"Access-Control-Allow-Headers": "Content-Type, Authorization, page",
 			}});
 		}
 
@@ -447,15 +447,28 @@ export default {
 
 			// 記事の更新、作成
 			if (pathname === "/blog/update") {
-				const token = request.headers.get("Authorization");
-
-				// トークン認証
-				if (!token || token.replace("Bearer ", "") !== env.AUTH_TOKEN) {
-					return createJsonResponse(403, "Forbidden", { error: "Invalid authorization token" });
+				if (request.method !== "POST") {
+					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
 				}
 
-				if (request.method !== "POST") { // postだけ許可する
-					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
+				let idToken = request.headers.get("Authorization");
+				if (!idToken) {
+					return createJsonResponse(401, "Unauthorized", { error: "Authorization header is required" });
+				}
+				idToken = idToken.replace("Bearer ", "");
+
+				const data: any = await verifyIdToken(env, idToken);
+
+				if (!data) {
+					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
+				}
+
+				if (data.disabled) {
+					return createJsonResponse(403, "Forbidden", { error: "User account is disabled" });
+				}
+
+				if (data.error && data.error.message === "INVALID_ID_TOKEN") {
+					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
 				}
 
 				const page = request.headers.get("page");
@@ -465,10 +478,11 @@ export default {
 				}
 
 				const res = await updatePost(`${page}.md`, content as string, "Update post via Cloudflare Worker", env.GITHUB_TOKEN);
-				const data: any = await res.json();
-				data.success = true;
+				const data2: any = await res.json();
 
-				return createJsonResponse(res.status, res.statusText, data);
+				data2.success = true;
+				
+				return createJsonResponseRaw(data2);
 			}
 
 			// discord
