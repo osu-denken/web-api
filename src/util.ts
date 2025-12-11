@@ -41,6 +41,25 @@ export function parseFrontMatter(md: string): FMObj {
   return res;
 }
 
+export function createFrontMatter(meta: Record<string, any>, content: string): string {
+  const lines: string[] = ['---'];
+
+  for (const [key, value] of Object.entries(meta)) {
+    if (Array.isArray(value)) {
+      lines.push(`${key}: [${value.join(', ')}]`);
+    } else {
+      lines.push(`${key}: ${value}`);
+    }
+  }
+
+  lines.push('---', '', content);
+
+  return lines.join('\n');
+}
+
+export function FMObj2FrontMatterString(fm: FMObj): string {
+  return createFrontMatter(fm.meta, fm.content);
+}
 
 export function txt2base64(str: string) {
 	const bytes = new TextEncoder().encode(str);

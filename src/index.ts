@@ -5,7 +5,8 @@ import {
   createJsonResponseRaw,
   sha256,
   parseFrontMatter,
-  FMObj
+  FMObj,
+  createFrontMatter
 } from "./util";
 
 const OWNER = "osu-denken";
@@ -472,7 +473,7 @@ export default {
 			}
 
 			// 記事の更新、作成
-			if (pathname === "/blog/update") {
+			if (pathname === "/v1/blog/update") {
 				if (request.method !== "POST") {
 					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
 				}
@@ -504,6 +505,55 @@ export default {
 				}
 
 				const res = await updatePost(`${page}.md`, content as string, "Update post via Cloudflare Worker", env.GITHUB_TOKEN);
+				const data2: any = await res.json();
+
+				data2.success = true;
+				
+				return createJsonResponseRaw(data2);
+			}
+
+			// v2ではメタデータを分離して扱う
+			if (pathname === "/v2/blog/update") {
+				if (request.method !== "POST") {
+					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
+				}
+				let idToken = request.headers.get("Authorization");
+				if (!idToken) {
+					return createJsonResponse(401, "Unauthorized", { error: "Authorization header is required" });
+				}
+				idToken = idToken.replace("Bearer ", "");
+
+				const data: any = await verifyIdToken(env, idToken);
+
+				if (!data) {
+					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
+				}
+
+				if (data.disabled) {
+					return createJsonResponse(403, "Forbidden", { error: "User account is disabled" });
+				}
+
+				if (data.error && data.error.message === "INVALID_ID_TOKEN") {
+					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
+				}
+
+				const page = request.headers.get("page");
+				const _meta = request.headers.get("meta");
+				const _content = request.headers.get("content") || await request.text();
+				if (!page || !_content || !_meta) {
+					return createJsonResponse(400, "Bad Request", { error: "page, meta and content headers are required" });
+				}
+
+				let meta: any = {};
+				try {
+					meta = JSON.parse(_meta);
+				} catch (e) {
+					return createJsonResponse(400, "Bad Request", { error: "meta header is not valid JSON" });
+				}
+
+				const content = createFrontMatter(meta, _content as string);
+
+				const res = await updatePost(`${page}.md`, content, "Update post via Cloudflare Worker", env.GITHUB_TOKEN);
 				const data2: any = await res.json();
 
 				data2.success = true;
