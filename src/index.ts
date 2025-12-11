@@ -90,7 +90,7 @@ async function updatePost(path: string, content: string, message: string, token:
 		const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts/${path}`;
 		const body: { message: string; content: string; branch: string; sha?: string } = {
 			message,
-			content: btoa(content),
+			content: txt2base64(content),
 			branch: BRANCH
 		};
 		
