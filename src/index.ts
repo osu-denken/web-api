@@ -5,7 +5,8 @@ import {
   base642txt,
   createJsonResponse,
   createJsonResponseRaw,
-  sha256
+  sha256,
+  parseFrontMatter
 } from "./util";
 
 const OWNER = "osu-denken";
@@ -427,16 +428,15 @@ export default {
 				if (data.encoding && data.encoding === "base64")
 					content = base642txt(data.content);
 
-				const parsed = matter(content);
+				const parsed = parseFrontMatter(content);
 
 				return createJsonResponseRaw({
 					name: data.name.replace(".md", ""),
 					sha: data.sha,
 					size: data.size,
-					meta: parsed.data,
+					meta: parsed.meta,
 					content: parsed.content
 				});
-
 			}
 
 			// 認証テスト

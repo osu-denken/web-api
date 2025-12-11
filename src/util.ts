@@ -1,3 +1,47 @@
+export interface FMObj {
+  meta: Record<string, any>;
+  content: string;
+}
+
+export function parseFrontMatter(md: string): FMObj {
+  const res: FMObj = { meta: {}, content: md };
+
+  if (!md.startsWith('---')) return res;
+
+  const endIndex = md.indexOf('---', 3);
+  if (endIndex === -1) return res;
+
+  const metaString = md.slice(3, endIndex).trim();
+  const body = md.slice(endIndex + 3).trim();
+
+  const lines = metaString.split('\n');
+
+  for (const line of lines) {
+    if (!line.includes(':')) continue;
+
+    const [key, ...rest] = line.split(':');
+    if (!key) continue;
+
+    const valueRaw = rest.join(':').trim();
+
+    let value: any = valueRaw;
+    if (valueRaw.startsWith('[') && valueRaw.endsWith(']')) {
+      const arrayValues = valueRaw
+        .slice(1, -1)
+        .split(',')
+        .map(v => v.trim())
+        .filter(v => v.length > 0);
+      value = arrayValues;
+    }
+
+    res.meta[key.trim()] = value;
+  }
+
+  res.content = body;
+  return res;
+}
+
+
 export function txt2base64(str: string) {
 	const bytes = new TextEncoder().encode(str);
 	let binary = '';
