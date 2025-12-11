@@ -404,6 +404,9 @@ export default {
 				const data: any = await res.json();
 
 				if (!data.content) {
+					if (data.status === 404) {
+						return createJsonResponse(404, "Not Found", { error: "Post not found" });
+					}
 					return createJsonResponse(404, "Not Found", { error: "Post not found", data });
 				}
 
@@ -429,6 +432,10 @@ export default {
 				const data: any = await res.json();
 
 				if (!data.content) {
+					if (data.status === 404) {
+						return createJsonResponse(404, "Not Found", { error: "Post not found" });
+					}
+
 					return createJsonResponse(404, "Not Found", { error: "Post not found", data });
 				}
 
