@@ -301,7 +301,7 @@ export default {
 				// 24h 有効
 				await env.INVITE_CODE.put(code, data.localId, { expirationTtl: 86400 });
 
-				env.LOGS.put(`invite:${Date.now()}`, JSON.stringify({
+				await env.LOGS.put(`invite:${Date.now()}`, JSON.stringify({
 					createdBy: data.localId,
 					inviteCode: code,
 					ip: request.headers.get("CF-Connecting-IP") || "unknown",
@@ -341,7 +341,7 @@ export default {
 
 				await env.INVITE_CODE.delete(code);
 
-				env.LOGS.put(`invite_delete:${Date.now()}`, JSON.stringify({
+				await env.LOGS.put(`invite_delete:${Date.now()}`, JSON.stringify({
 					inviteCode: code,
 					ip: request.headers.get("CF-Connecting-IP") || "unknown",
 					userAgent: request.headers.get("User-Agent") || "unknown",
@@ -388,7 +388,7 @@ export default {
 					await env.INVITE_CODE.delete(passphrase);
 				}
 
-				env.LOGS.put(`register:${Date.now()}`, JSON.stringify({
+				await env.LOGS.put(`register:${Date.now()}`, JSON.stringify({
 					email,
 					ip: request.headers.get("CF-Connecting-IP") || "unknown",
 					userAgent: request.headers.get("User-Agent") || "unknown",
@@ -422,7 +422,7 @@ export default {
 
 				const data: any = await loginUser(env, email, password);
 
-				env.LOGS.put(`login:${Date.now()}`, JSON.stringify({
+				await env.LOGS.put(`login:${Date.now()}`, JSON.stringify({
 					email,
 					ip: request.headers.get("CF-Connecting-IP") || "unknown",
 					userAgent: request.headers.get("User-Agent") || "unknown",
@@ -470,7 +470,7 @@ export default {
 				const data: any = await res.json();
 				data.success = true;
 
-				env.LOGS.put(`update_user:${Date.now()}`, JSON.stringify({
+				await env.LOGS.put(`update_user:${Date.now()}`, JSON.stringify({
 					updatedBy: data.localId,
 					updates: body,
 					ip: request.headers.get("CF-Connecting-IP") || "unknown",
@@ -493,7 +493,7 @@ export default {
 				const data: any = await resetPassword(env, email);
 				data.success = true;
 
-				env.LOGS.put(`reset_password:${Date.now()}`, JSON.stringify({
+				await env.LOGS.put(`reset_password:${Date.now()}`, JSON.stringify({
 					email,
 					ip: request.headers.get("CF-Connecting-IP") || "unknown",
 					userAgent: request.headers.get("User-Agent") || "unknown",
@@ -795,7 +795,7 @@ export default {
 
 				data2.success = true;
 
-				env.LOGS.put(`blog_update:${Date.now()}`, JSON.stringify({
+				await env.LOGS.put(`blog_update:${Date.now()}`, JSON.stringify({
 					updatedBy: data.localId,
 					page,
 					ip: request.headers.get("CF-Connecting-IP") || "unknown",
@@ -851,7 +851,7 @@ export default {
 
 				data2.success = true;
 
-				env.LOGS.put(`blog_update:${Date.now()}`, JSON.stringify({
+				await env.LOGS.put(`blog_update:${Date.now()}`, JSON.stringify({
 					updatedBy: data.localId,
 					page,
 					ip: request.headers.get("CF-Connecting-IP") || "unknown",
