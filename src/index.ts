@@ -1,12 +1,11 @@
-import matter from "gray-matter";
-
 import { 
   txt2base64,
   base642txt,
   createJsonResponse,
   createJsonResponseRaw,
   sha256,
-  parseFrontMatter
+  parseFrontMatter,
+  FMObj
 } from "./util";
 
 const OWNER = "osu-denken";
