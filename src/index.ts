@@ -391,7 +391,7 @@ export default {
 			}
 
 			// 記事の取得
-			if (pathname === "/blog/get") {
+			if (pathname === "/v1/blog/get") {
 				let page = url.searchParams.get("page");
 				if (!page) return createJsonResponse(400, "Bad Request", { error: "page parameter is required" });
 
@@ -410,6 +410,55 @@ export default {
 					size: data.size,
 					content: content
 				});
+			}
+
+			if (pathname === "/v2/blog/get") {
+				let page = url.searchParams.get("page");
+				if (!page) return createJsonResponse(400, "Bad Request", { error: "page parameter is required" });
+
+				page = `${page}.md`;
+
+				const res = await getPost(page, env.GITHUB_TOKEN);
+				const data: any = await res.json();
+
+				let content = data.content;
+				if (data.encoding && data.encoding === "base64")
+					content = base642txt(data.content);
+
+				// メタ情報の抽出
+				const meta: Record<string, any> = {};
+				let body = content;
+				if (content.startsWith("---")) {
+					const endIndex = content.indexOf("---", 3);
+					if (endIndex !== -1) {
+						const metaString = content.substring(3, endIndex).trim();
+						body = content.substring(endIndex + 3).trim();
+
+						const lines = metaString.split("\n");
+						for (const line of lines) {
+							const [key, ...rest] = line.split(":");
+							if (key && rest !== undefined) {
+								const value = rest.trim();
+								// 配列の処理
+								if (value.startsWith("[") && value.endsWith("]")) {
+									const arrayValues = value.substring(1, value.length - 1).split(",").map(v => v.trim());
+									meta[key.trim()] = arrayValues;
+								} else {
+									meta[key.trim()] = value;
+								}
+							}
+						}
+					}
+				}
+
+				return createJsonResponseRaw({
+					name: data.name.replace(".md", ""),
+					sha: data.sha,
+					size: data.size,
+					meta,
+					content: body
+				});
+
 			}
 
 			// 認証テスト
