@@ -22,6 +22,8 @@ export interface Env {
 	GOOGLE_DRIVE_TOKEN: string;
 
     BLOG_META: KVNamespace;
+	INVITE_CODE: KVNamespace;
+	LOGS: KVNamespace;
 }
 
 // blog api
@@ -145,6 +147,7 @@ async function loginUser(env: Env, email: string, password: string) {
 		})
 	});
 	const data = await res.json();
+
 	return data;
 }
 
@@ -182,6 +185,16 @@ async function verifyIdToken(env: Env, idToken: string) {
 	return data.users[0]; // ユーザー情報
 }
 
+function generateInviteCode(length = 8): string {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let code = "";
+    for (let i = 0; i < length; i++) {
+        code += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return code;
+}
+
+
 
 export default {
 	async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
@@ -210,6 +223,134 @@ export default {
 			}
 
 			// user api
+			if (pathname === "/user/exists") {
+				if (request.method !== "POST") {
+					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
+				}
+
+				let { email } = await request.json() as { email: string };
+				if (!email) {
+					return createJsonResponse(400, "Bad Request", { error: "email is required" });
+				}
+
+				if (!email.includes("@")) email = email + `@ge.osaka-sandai.ac.jp`;
+
+				if (!email.match(/@(.+?)\.osaka-sandai\.ac\.jp$/)) {
+					return createJsonResponse(400, "Bad Request", { error: "Email must be from osaka-sandai.ac.jp domain" });
+				}
+
+				// すべて小文字にし、先頭にsがなければsを追加する。
+				email = email.toLowerCase();
+				if (!email.startsWith("s")) {
+					email = `s` + email;
+				}
+
+				const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${env.FIREBASE_API_KEY}`, {
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json"
+					},
+					body: JSON.stringify({
+						email
+					})
+				});
+				const data: any = await res.json();
+
+				if (data.error) {
+					if (data.error.message === "EMAIL_NOT_FOUND") {
+						return createJsonResponseRaw({ exists: false });
+					} else {
+						return createJsonResponse(500, "Internal Server Error", { error: data.error.message });
+					}
+				}
+
+				if (data.users && data.users.length > 0) {
+					return createJsonResponseRaw({ exists: true });
+				} else {
+					return createJsonResponseRaw({ exists: false });
+				}
+			}
+
+			if (pathname === "/invite/create") {
+				if (request.method !== "POST") {
+					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
+				}
+
+				let idToken = request.headers.get("Authorization");
+				if (!idToken) {
+					return createJsonResponse(401, "Unauthorized", { error: "Authorization header is required" });
+				}
+				idToken = idToken.replace("Bearer ", "");
+
+				const data: any = await verifyIdToken(env, idToken);
+
+				if (!data) {
+					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
+				}
+
+				if (data.disabled) {
+					return createJsonResponse(403, "Forbidden", { error: "User account is disabled" });
+				}
+
+				if (data.error && data.error.message === "INVALID_ID_TOKEN") {
+					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
+				}
+
+				const code = generateInviteCode(12);
+
+				// 24h 有効
+				await env.INVITE_CODE.put(code, data.localId, { expirationTtl: 86400 });
+
+				env.LOGS.put(`invite:${Date.now()}`, JSON.stringify({
+					createdBy: data.localId,
+					inviteCode: code,
+					ip: request.headers.get("CF-Connecting-IP") || "unknown",
+					userAgent: request.headers.get("User-Agent") || "unknown",
+				}), { expirationTtl: 60 * 60 * 24 * 365 }); // 365日間保存
+
+				return createJsonResponseRaw({ code, success: true });
+			}
+
+			if (pathname === "/invite/validate") {
+				if (request.method !== "POST") {
+					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
+				}
+
+				const { code } = await request.json() as { code: string };
+				if (!code) {
+					return createJsonResponse(400, "Bad Request", { error: "code is required" });
+				}
+
+				const localId = await env.INVITE_CODE.get(code);
+				if (!localId) {
+					return createJsonResponseRaw({ valid: false });
+				}
+
+				return createJsonResponseRaw({ valid: true, localId });
+			}
+
+			if (pathname === "/invite/delete") {
+				if (request.method !== "POST") {
+					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
+				}
+
+				const { code } = await request.json() as { code: string };
+				if (!code) {
+					return createJsonResponse(400, "Bad Request", { error: "code is required" });
+				}
+
+				await env.INVITE_CODE.delete(code);
+
+				env.LOGS.put(`invite_delete:${Date.now()}`, JSON.stringify({
+					inviteCode: code,
+					ip: request.headers.get("CF-Connecting-IP") || "unknown",
+					userAgent: request.headers.get("User-Agent") || "unknown",
+				}), { expirationTtl: 60 * 60 * 24 * 365 }); // 365日間保存
+
+				return createJsonResponseRaw({ success: true });
+			}
+
+			// ユーザー登録
 			if (pathname === "/user/register") {
 				if (request.method !== "POST") {
 					return createJsonResponse(405, "Method Not Allowed", { error: "Only POST method is allowed" });
@@ -218,7 +359,13 @@ export default {
 				let { email, password, passphrase } = await request.json() as { email: string; password: string, passphrase: string };
 
 				if (passphrase !== env.REGISTER_PASSPHRASE) {
-					return createJsonResponse(403, "Forbidden", { error: "Invalid passphrase" });
+					const localId = await env.INVITE_CODE.get(passphrase);
+					if (!localId) {
+						return createJsonResponse(403, "Forbidden", { error: "Invalid passphrase or invite code" });
+					} else {
+						// 招待コードを削除
+						await env.INVITE_CODE.delete(passphrase);
+					}
 				}
 				
 				if (!email || !password) {
@@ -240,6 +387,13 @@ export default {
 				const data: any = await registerUser(env, email, password);
 				data.success = true;
 
+				env.LOGS.put(`register:${Date.now()}`, JSON.stringify({
+					email,
+					ip: request.headers.get("CF-Connecting-IP") || "unknown",
+					userAgent: request.headers.get("User-Agent") || "unknown",
+					code: passphrase === env.REGISTER_PASSPHRASE ? "REGISTER_PASSPHRASE" : passphrase,
+				}), { expirationTtl: 60 * 60 * 24 * 365 }); // 365日間保存
+
 				return createJsonResponseRaw(data);
 			}
 
@@ -255,9 +409,9 @@ export default {
 
 				if (!email.includes("@")) email = `${email}@ge.osaka-sandai.ac.jp`;
 
-				if (env.AUTH_TOKEN === "") {
-					return createJsonResponse(500, "Internal Server Error", { error: "AUTH_TOKEN is not set" });
-				}
+				// if (env.AUTH_TOKEN === "") {
+				// 	return createJsonResponse(500, "Internal Server Error", { error: "AUTH_TOKEN is not set" });
+				// }
 				
 				// すべて小文字にし、先頭にsがなければsを追加する。
 				email = email.toLowerCase();
@@ -266,6 +420,13 @@ export default {
 				}
 
 				const data: any = await loginUser(env, email, password);
+
+				env.LOGS.put(`login:${Date.now()}`, JSON.stringify({
+					email,
+					ip: request.headers.get("CF-Connecting-IP") || "unknown",
+					userAgent: request.headers.get("User-Agent") || "unknown",
+				}), { expirationTtl: 60 * 60 * 24 * 365 }); // 365日間保存
+
 				data.success = true;
 
 				return createJsonResponseRaw(data);
@@ -308,6 +469,13 @@ export default {
 				const data: any = await res.json();
 				data.success = true;
 
+				env.LOGS.put(`update_user:${Date.now()}`, JSON.stringify({
+					updatedBy: data.localId,
+					updates: body,
+					ip: request.headers.get("CF-Connecting-IP") || "unknown",
+					userAgent: request.headers.get("User-Agent") || "unknown",
+				}), { expirationTtl: 60 * 60 * 24 * 365 }); // 365日間保存
+
 				return createJsonResponseRaw(data);
 			}
 
@@ -323,6 +491,12 @@ export default {
 
 				const data: any = await resetPassword(env, email);
 				data.success = true;
+
+				env.LOGS.put(`reset_password:${Date.now()}`, JSON.stringify({
+					email,
+					ip: request.headers.get("CF-Connecting-IP") || "unknown",
+					userAgent: request.headers.get("User-Agent") || "unknown",
+				}), { expirationTtl: 60 * 60 * 24 * 365 }); // 365日間保存
 
 				return createJsonResponseRaw(data);
 			}
@@ -619,6 +793,13 @@ export default {
 				const data2: any = await res.json();
 
 				data2.success = true;
+
+				env.LOGS.put(`blog_update:${Date.now()}`, JSON.stringify({
+					updatedBy: data.localId,
+					page,
+					ip: request.headers.get("CF-Connecting-IP") || "unknown",
+					userAgent: request.headers.get("User-Agent") || "unknown",
+				}), { expirationTtl: 60 * 60 * 24 * 365 }); // 365日間保存
 				
 				return createJsonResponseRaw(data2);
 			}
@@ -668,6 +849,22 @@ export default {
 				const data2: any = await res.json();
 
 				data2.success = true;
+
+				env.LOGS.put(`blog_update:${Date.now()}`, JSON.stringify({
+					updatedBy: data.localId,
+					page,
+					ip: request.headers.get("CF-Connecting-IP") || "unknown",
+					userAgent: request.headers.get("User-Agent") || "unknown",
+				}), { expirationTtl: 60 * 60 * 24 * 365 }); // 365日間保存
+
+				const kvKey = `meta:${page}`;
+				await env.BLOG_META.put(
+					kvKey,
+					JSON.stringify({
+						sha: data2.content.sha,
+						meta: meta
+					})
+				);
 				
 				return createJsonResponseRaw(data2);
 			}

@@ -14,6 +14,14 @@
 		{
 			"binding": "BLOG_META",
 			"id": "e71f8004bcf14b53bd9f88e021bb7d20"
+		},
+		{
+			"binding": "INVITE_CODE",
+			"id": "56f622d80c8d41a9ac125669eba7d331"
+		},
+		{
+			"binding": "LOGS",
+			"id": "4b5aae44f15440df8ae2cd1ba1736f6d"
 		}
 	]
 	/**
