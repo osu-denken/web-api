@@ -362,9 +362,6 @@ export default {
 					const localId = await env.INVITE_CODE.get(passphrase);
 					if (!localId) {
 						return createJsonResponse(403, "Forbidden", { error: "Invalid passphrase or invite code" });
-					} else {
-						// 招待コードを削除
-						await env.INVITE_CODE.delete(passphrase);
 					}
 				}
 				
@@ -386,6 +383,10 @@ export default {
 
 				const data: any = await registerUser(env, email, password);
 				data.success = true;
+				
+				if (passphrase !== env.REGISTER_PASSPHRASE) {
+					await env.INVITE_CODE.delete(passphrase);
+				}
 
 				env.LOGS.put(`register:${Date.now()}`, JSON.stringify({
 					email,
