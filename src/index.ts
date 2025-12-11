@@ -20,6 +20,8 @@ export interface Env {
 	DISCORD_INVITE: string;
 	REGISTER_PASSPHRASE: string;
 	GOOGLE_DRIVE_TOKEN: string;
+
+    BLOG_META: KVNamespace;
 }
 
 // blog api
@@ -184,6 +186,8 @@ async function verifyIdToken(env: Env, idToken: string) {
 export default {
 	async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
 		if (!env.GITHUB_TOKEN) return new Response("GITHUB_TOKEN is not set", { status: 500 });
+
+		const cache = caches.default;
 
 		const url = new URL(request.url);
 		const pathname: string = url.pathname;
@@ -397,31 +401,46 @@ export default {
 				const res = await getList(env.GITHUB_TOKEN);
 				const data: any = await res.json();
 
-				// タイトルをメタデータから取得する
 				for (const page of data) {
+					const kvKey = `meta:${page.name.replace(".md", "")}`;
+
+					const cachedStr = await env.BLOG_META.get(kvKey);
+					let cached = cachedStr ? JSON.parse(cachedStr) : null;
+
+					if (cached && cached.sha === page.sha) {
+						page.meta = cached.meta;
+						continue;
+					}
+
 					const postRes = await getPost(page.name, env.GITHUB_TOKEN);
 					const postData: any = await postRes.json();
 
 					if (postData.content) {
 						let content = postData.content;
-						if (postData.encoding && postData.encoding === "base64")
-							content = base642txt(postData.content);
+						if (postData.encoding === "base64") {
+							content = base642txt(content);
+						}
 
 						const parsed = parseFrontMatter(content);
-						if (parsed.meta) {
-							page.meta = parsed.meta;
-						} else {
-							page.meta = {};
-						}
+						page.meta = parsed.meta || {};
+
+						await env.BLOG_META.put(
+							kvKey,
+							JSON.stringify({
+								sha: page.sha,
+								meta: page.meta
+							})
+						);
 					} else {
-						page.title = page.name.replace(".md", "");
+						page.meta = {};
 					}
 				}
 
 				const result = data.map((page: any) => ({
 					name: page.name.replace(".md", ""),
 					sha: page.sha,
-					size: page.size
+					size: page.size,
+					meta: page.meta
 				}));
 				
 				return createJsonResponseRaw(result);
@@ -459,26 +478,57 @@ export default {
 
 			if (pathname === "/v2/blog/get") {
 				let page = url.searchParams.get("page");
-				if (!page) return createJsonResponse(400, "Bad Request", { error: "page parameter is required" });
+				if (!page) {
+					return createJsonResponse(400, "Bad Request", { error: "page parameter is required" });
+				}
 
-				page = `${page}.md`;
+				const fileName = `${page}.md`;
+				const kvKey = `meta:${page}`;
 
-				const res = await getPost(page, env.GITHUB_TOKEN);
+				const cachedStr = await env.BLOG_META.get(kvKey);
+				let cached = cachedStr ? JSON.parse(cachedStr) : null;
+
+				const res = await getPost(fileName, env.GITHUB_TOKEN);
 				const data: any = await res.json();
 
 				if (!data.content) {
 					if (data.status === 404) {
 						return createJsonResponse(404, "Not Found", { error: "Post not found" });
 					}
-
 					return createJsonResponse(404, "Not Found", { error: "Post not found", data });
 				}
 
+				if (cached && cached.sha === data.sha) {
+					let content = data.content;
+					if (data.encoding === "base64") {
+						content = base642txt(data.content);
+					}
+
+					const parsed = parseFrontMatter(content);
+
+					return createJsonResponseRaw({
+						name: data.name.replace(".md", ""),
+						sha: data.sha,
+						size: data.size,
+						meta: cached.meta,
+						content: parsed.content
+					});
+				}
+
 				let content = data.content;
-				if (data.encoding && data.encoding === "base64")
+				if (data.encoding === "base64") {
 					content = base642txt(data.content);
+				}
 
 				const parsed = parseFrontMatter(content);
+
+				await env.BLOG_META.put(
+					kvKey,
+					JSON.stringify({
+						sha: data.sha,
+						meta: parsed.meta
+					})
+				);
 
 				return createJsonResponseRaw({
 					name: data.name.replace(".md", ""),
