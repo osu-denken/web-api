@@ -380,9 +380,43 @@ export default {
 			// blog api
 
 			// 記事一覧の取得
-			if (pathname === "/blog/list") {
+			if (pathname === "/v1/blog/list") {
 				const res = await getList(env.GITHUB_TOKEN);
 				const data: any = await res.json();
+
+				const result = data.map((page: any) => ({
+					name: page.name.replace(".md", ""),
+					sha: page.sha,
+					size: page.size
+				}));
+				
+				return createJsonResponseRaw(result);
+			}
+
+			if (pathname === "/v2/blog/list") {
+				const res = await getList(env.GITHUB_TOKEN);
+				const data: any = await res.json();
+
+				// タイトルをメタデータから取得する
+				for (const page of data) {
+					const postRes = await getPost(page.name, env.GITHUB_TOKEN);
+					const postData: any = await postRes.json();
+
+					if (postData.content) {
+						let content = postData.content;
+						if (postData.encoding && postData.encoding === "base64")
+							content = base642txt(postData.content);
+
+						const parsed = parseFrontMatter(content);
+						if (parsed.meta) {
+							page.meta = parsed.meta;
+						} else {
+							page.meta = {};
+						}
+					} else {
+						page.title = page.name.replace(".md", "");
+					}
+				}
 
 				const result = data.map((page: any) => ({
 					name: page.name.replace(".md", ""),
@@ -407,6 +441,7 @@ export default {
 					if (data.status === 404) {
 						return createJsonResponse(404, "Not Found", { error: "Post not found" });
 					}
+					
 					return createJsonResponse(404, "Not Found", { error: "Post not found", data });
 				}
 
