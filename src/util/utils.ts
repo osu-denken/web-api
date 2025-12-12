@@ -91,7 +91,7 @@ export async function logInfo(request: Request, env: Env, type: string, message:
 	), { expirationTtl: ttl });
 }
 
-export function createJsonResponse(status: number, statusText: string, body: any) {
+export function createJsonResponse2(status: number, statusText: string, body: any) {
 	return new Response(
 		JSON.stringify(
 			{
@@ -100,6 +100,20 @@ export function createJsonResponse(status: number, statusText: string, body: any
 				body
 			}, null, 2
 		),
+		{ 
+			status, 
+			headers: {
+				"Content-Type": "application/json",
+				"Access-Control-Allow-Origin": "*",
+				"Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
+				"Access-Control-Allow-Headers": "Content-Type, Authorization, page",
+			} 
+		}
+	);
+}
+
+export function createResponse(status: number, body: any) {
+	return new Response(body, 
 		{ 
 			status, 
 			headers: {
@@ -134,7 +148,7 @@ export function sha256(data: string): Promise<string> {
 }
 
 export function die(msg: string) {
-	return createJsonResponse(500, "Internal Server Error", { error: msg });
+	return createJsonResponse2(500, "Internal Server Error", { error: msg });
 }
 
 export function generateInviteCode(length = 8): string {

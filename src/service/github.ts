@@ -1,4 +1,4 @@
-import { txt2base64 } from "../utils";
+import { txt2base64 } from "../util/utils";
 
 const OWNER = "osu-denken";
 const REPO = "blog";
