@@ -40,6 +40,16 @@ function requestGitHub(url: string, method: string, token: string, body?: any) {
 	});
 }
 
+async function logInfo(request: Request, env: Env, type: string, message: string, ttl = 60 * 60 * 24 * 365) { // default: 365 days
+	await env.LOGS.put(`${type}:${Date.now()}`, JSON.stringify(
+		{ 
+		    message,
+		    ip: request.headers.get("CF-Connecting-IP") || "unknown",
+		    userAgent: request.headers.get("User-Agent") || "unknown",
+		}, null, 2
+	), { expirationTtl: ttl });
+}
+
 async function getFileFromDrive(env: Env, fileId: string) {
   const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
     headers: {
@@ -50,7 +60,6 @@ async function getFileFromDrive(env: Env, fileId: string) {
   if (!res.ok) throw new Error("Failed to fetch file");
   return await res.text();
 }
-
 
 // invite github organization
 async function inviteGitHubOrganization(env: Env, email: string) {
@@ -200,8 +209,6 @@ export default {
 	async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
 		if (!env.GITHUB_TOKEN) return new Response("GITHUB_TOKEN is not set", { status: 500 });
 
-		const cache = caches.default;
-
 		const url = new URL(request.url);
 		const pathname: string = url.pathname;
 
@@ -300,13 +307,7 @@ export default {
 
 				// 24h 有効
 				await env.INVITE_CODE.put(code, data.localId, { expirationTtl: 86400 });
-
-				await env.LOGS.put(`invite:${Date.now()}`, JSON.stringify({
-					createdBy: data.localId,
-					inviteCode: code,
-					ip: request.headers.get("CF-Connecting-IP") || "unknown",
-					userAgent: request.headers.get("User-Agent") || "unknown",
-				}), { expirationTtl: 60 * 60 * 24 * 365 }); // 365日間保存
+				await logInfo(request, env, "invite", `Create invite-code "${code}" by ${data.localId}: ${code}`);
 
 				return createJsonResponseRaw({ code, success: true });
 			}
@@ -340,12 +341,7 @@ export default {
 				}
 
 				await env.INVITE_CODE.delete(code);
-
-				await env.LOGS.put(`invite_delete:${Date.now()}`, JSON.stringify({
-					inviteCode: code,
-					ip: request.headers.get("CF-Connecting-IP") || "unknown",
-					userAgent: request.headers.get("User-Agent") || "unknown",
-				}), { expirationTtl: 60 * 60 * 24 * 365 }); // 365日間保存
+				await logInfo(request, env, "invite", `Delete invite-code "${code}"`);
 
 				return createJsonResponseRaw({ success: true });
 			}
@@ -384,16 +380,10 @@ export default {
 				const data: any = await registerUser(env, email, password);
 				data.success = true;
 				
-				if (passphrase !== env.REGISTER_PASSPHRASE) {
+				if (passphrase !== env.REGISTER_PASSPHRASE) 
 					await env.INVITE_CODE.delete(passphrase);
-				}
 
-				await env.LOGS.put(`register:${Date.now()}`, JSON.stringify({
-					email,
-					ip: request.headers.get("CF-Connecting-IP") || "unknown",
-					userAgent: request.headers.get("User-Agent") || "unknown",
-					code: passphrase === env.REGISTER_PASSPHRASE ? "REGISTER_PASSPHRASE" : passphrase,
-				}), { expirationTtl: 60 * 60 * 24 * 365 }); // 365日間保存
+				await logInfo(request, env, "register", `Register user "${email}" with code: ${passphrase === env.REGISTER_PASSPHRASE ? "REGISTER_PASSPHRASE" : passphrase}`);
 
 				return createJsonResponseRaw(data);
 			}
@@ -422,11 +412,7 @@ export default {
 
 				const data: any = await loginUser(env, email, password);
 
-				await env.LOGS.put(`login:${Date.now()}`, JSON.stringify({
-					email,
-					ip: request.headers.get("CF-Connecting-IP") || "unknown",
-					userAgent: request.headers.get("User-Agent") || "unknown",
-				}), { expirationTtl: 60 * 60 * 24 * 365 }); // 365日間保存
+				await logInfo(request, env, "login", `Login "${email}"`);
 
 				data.success = true;
 
@@ -470,12 +456,7 @@ export default {
 				const data: any = await res.json();
 				data.success = true;
 
-				await env.LOGS.put(`update_user:${Date.now()}`, JSON.stringify({
-					updatedBy: data.localId,
-					updates: body,
-					ip: request.headers.get("CF-Connecting-IP") || "unknown",
-					userAgent: request.headers.get("User-Agent") || "unknown",
-				}), { expirationTtl: 60 * 60 * 24 * 365 }); // 365日間保存
+				await logInfo(request, env, "update_user", `Update user "${data.localId}": ${JSON.stringify(body, null, 2)}`);
 
 				return createJsonResponseRaw(data);
 			}
@@ -493,11 +474,7 @@ export default {
 				const data: any = await resetPassword(env, email);
 				data.success = true;
 
-				await env.LOGS.put(`reset_password:${Date.now()}`, JSON.stringify({
-					email,
-					ip: request.headers.get("CF-Connecting-IP") || "unknown",
-					userAgent: request.headers.get("User-Agent") || "unknown",
-				}), { expirationTtl: 60 * 60 * 24 * 365 }); // 365日間保存
+				await logInfo(request, env, "reset_password", `Reset password for "${email}"`);
 
 				return createJsonResponseRaw(data);
 			}
@@ -795,12 +772,7 @@ export default {
 
 				data2.success = true;
 
-				await env.LOGS.put(`blog_update:${Date.now()}`, JSON.stringify({
-					updatedBy: data.localId,
-					page,
-					ip: request.headers.get("CF-Connecting-IP") || "unknown",
-					userAgent: request.headers.get("User-Agent") || "unknown",
-				}), { expirationTtl: 60 * 60 * 24 * 365 }); // 365日間保存
+				await logInfo(request, env, "blog_update", `Update blog post "${page}" by ${data.localId}`);
 				
 				return createJsonResponseRaw(data2);
 			}
@@ -851,12 +823,7 @@ export default {
 
 				data2.success = true;
 
-				await env.LOGS.put(`blog_update:${Date.now()}`, JSON.stringify({
-					updatedBy: data.localId,
-					page,
-					ip: request.headers.get("CF-Connecting-IP") || "unknown",
-					userAgent: request.headers.get("User-Agent") || "unknown",
-				}), { expirationTtl: 60 * 60 * 24 * 365 }); // 365日間保存
+				await logInfo(request, env, "blog_update", `Update blog post "${page}" by ${data.localId}`);
 
 				const kvKey = `meta:${page}`;
 				await env.BLOG_META.put(
