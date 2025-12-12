@@ -1,3 +1,5 @@
+import { HttpError } from "../util/HttpError";
+
 const BASE_URL = "https://identitytoolkit.googleapis.com/v1/accounts";
 
 export class FirebaseService {
@@ -66,6 +68,22 @@ export class FirebaseService {
         if (!res.ok || !data.users || data.users.length === 0) {
             return data; // 無効
         }
+
+
+        
+        // if (!data) {
+        //     return createJsonResponse2(401, "Unauthorized", { error: "Invalid idToken" });
+        // }
+
+        // if (data.disabled) {
+        //     return createJsonResponse2(403, "Forbidden", { error: "User account is disabled" });
+        // }
+
+        // if (data.error && data.error.message === "INVALID_ID_TOKEN") {
+        //     return createJsonResponse2(401, "Unauthorized", { error: "Invalid idToken" });
+        // }
+
+        // throw new HttpError(500, "INTERNAL_SERVER_ERROR", "Failed to verify idToken");
 
         return data.users[0]; // ユーザー情報
     }

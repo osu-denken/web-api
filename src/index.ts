@@ -1,9 +1,9 @@
 import { Env } from "./util/types";
 import { HttpError } from "./util/HttpError";
-
-const parentRoute = {
-	
-};
+import { UserController } from "./api/UserController";
+import { IController } from "./api/IController";
+import { FirebaseService } from "./service/firebase";
+import { GitHubService } from "./service/github";
 
 export default {
 	async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
@@ -18,14 +18,31 @@ export default {
 			}});
 		}
 
+		const path: string[] = pathname.split("/");
+
+		let controller: IController | null = null;
+		let authorization = request.headers.get("Authorization") ?? null;
+
 		try {
 			if (!env.GITHUB_TOKEN) throw new HttpError(500, "INTERNAL_SERVER_ERROR", "GITHUB_TOKEN is not set");
 			if (!env.FIREBASE_API_KEY) throw new HttpError(500, "INTERNAL_SERVER_ERROR", "FIREBASE_API_KEY is not set");
 
+			const github = new GitHubService(env.GITHUB_TOKEN);
+			const firebase = new FirebaseService(env.FIREBASE_API_KEY);
+
 			if (pathname === "/") return new Response("Welcome to osu-denken api!", { status: 200 });
-			if (pathname === "/ping") return new Response("pong", { status: 200 });
+			if (path[0] === "ping") return new Response("pong", { status: 200 });
+			if (path[0] === "user") controller = new UserController(path);
+			if (path[0] === "blog") controller = new BlogController(path);
+			if (path[0] === "invite") controller = new InviteController(path);
 
-
+			if (controller) {
+				controller.setServices(firebase, github);
+				controller.setRequest(request);
+				controller.setAuthorization(authorization);
+				controller.setEnv(env);
+				return controller.toResponse();
+			}
 
 			throw new HttpError(404, "NOT_FOUND", "Endpoint not found");
 
