@@ -1,3 +1,4 @@
+import { HttpError } from "../util/HttpError";
 import { createJsonResponseRaw } from "../util/utils";
 import { IController } from "./IController";
 
@@ -14,12 +15,14 @@ export class UserController extends IController {
     public route() {
         if (this.path[1] == "info") return this.info();
 
-        // return JSON.stringify(arr, null, 2);
+        throw HttpError.createNotFound("Endpoint not found");
     }
 
     public async info() {
+        if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
+        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
+
         const data: any = await this.firebase?.verifyIdToken?(this.authorization) : null;
         return createJsonResponseRaw(data);
     }
-
 }

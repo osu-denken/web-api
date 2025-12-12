@@ -4,6 +4,8 @@ import { UserController } from "./api/UserController";
 import { IController } from "./api/IController";
 import { FirebaseService } from "./service/firebase";
 import { GitHubService } from "./service/github";
+import { InviteController } from "./api/InviteController";
+import { BlogController } from "./api/BlogController";
 
 export default {
 	async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
@@ -36,11 +38,16 @@ export default {
 			if (path[0] === "blog") controller = new BlogController(path);
 			if (path[0] === "invite") controller = new InviteController(path);
 
+			// TODO: versioning, impl in IController
+			if (path[0] === "v1" && path[1] === "blog") controller = new BlogController(path);
+			if (path[0] === "v2" && path[1] === "blog") controller = new BlogController(path);
+
 			if (controller) {
 				controller.setServices(firebase, github);
 				controller.setRequest(request);
 				controller.setAuthorization(authorization);
 				controller.setEnv(env);
+				controller.setUrl(url);
 				return controller.toResponse();
 			}
 

@@ -1,3 +1,4 @@
+import { HttpError } from "../util/HttpError";
 import { txt2base64 } from "../util/utils";
 
 const OWNER = "osu-denken";
@@ -27,7 +28,11 @@ export class GitHubService {
     async getList() {
         try {
             const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts`;
-            return this.request(url, "GET");
+            const res = await this.request(url, "GET");
+
+            if (res.status === 404) throw new HttpError(404, "NOT_FOUND", "All posts not found");
+
+            return res;
         } catch (e) {
             return Promise.reject(e);
         }
@@ -36,7 +41,11 @@ export class GitHubService {
     async getPost(path: string) {
         try {
             const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts/${path}`;
-            return this.request(url, "GET");
+            const res = await this.request(url, "GET");
+
+            if (res.status === 404) throw new HttpError(404, "NOT_FOUND", "Post not found");
+
+            return res;
         } catch (e) {
             return Promise.reject(e);
         }

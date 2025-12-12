@@ -9,28 +9,12 @@ export abstract class IController {
     public request: Request | null = null;
     public authorization: string | null = null;
     public env: any = null;
+    public url: URL | null = null;
 
     public abstract getParentPath(): string;
 
     constructor(path: string[]) {
         this.path = path;
-    }
-
-    public setServices(firebase: FirebaseService | null, github: GitHubService | null) {
-        this.firebase = firebase;
-        this.github = github;
-    }
-
-    public setRequest(request: Request) {
-        this.request = request;
-    }
-
-    public setAuthorization(authorization: string | null) {
-        this.authorization = authorization;
-    }
-
-    public setEnv(env: any) {
-        this.env = env;
     }
 
     public abstract route() : any;
@@ -43,4 +27,29 @@ export abstract class IController {
             }
         });
     }
+
+    public setServices(firebase: FirebaseService | null, github: GitHubService | null) {
+        this.firebase = firebase;
+        this.github = github;
+    }
+
+    public setRequest(request: Request) {
+        this.request = request;
+    }
+
+    public setAuthorization(authorization: string | null) {
+        
+        this.authorization = authorization;
+        if (this.authorization == null) return;
+ 
+        this.authorization = this.authorization.replace("Bearer ", "");
+    }
+
+    public setEnv(env: any) {
+        this.env = env;
+    }
+
+	public setUrl(url: URL) {
+        this.url = url;
+	}
 }

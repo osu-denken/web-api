@@ -15,7 +15,7 @@ export class FirebaseService {
             "Content-Type": "application/json",
             "User-Agent": "osu-denken-admin-cloudflare-worker"
         };
-        return fetch(url + `?key=${this.apiKey}`, {
+        return fetch(url, {
             method: "POST",
             headers,
             body: JSON.stringify(body),
@@ -69,23 +69,13 @@ export class FirebaseService {
             return data; // 無効
         }
 
+        let result = data.users[0];
 
-        
-        // if (!data) {
-        //     return createJsonResponse2(401, "Unauthorized", { error: "Invalid idToken" });
-        // }
+        if (!result) throw HttpError.createUnauthorizedInvalidToken();
+        if (result.disabled) throw HttpError.createForbidden("User account is disabled");
+        if (result.error && result.error.message === "INVALID_ID_TOKEN") throw HttpError.createUnauthorizedInvalidToken();
 
-        // if (data.disabled) {
-        //     return createJsonResponse2(403, "Forbidden", { error: "User account is disabled" });
-        // }
-
-        // if (data.error && data.error.message === "INVALID_ID_TOKEN") {
-        //     return createJsonResponse2(401, "Unauthorized", { error: "Invalid idToken" });
-        // }
-
-        // throw new HttpError(500, "INTERNAL_SERVER_ERROR", "Failed to verify idToken");
-
-        return data.users[0]; // ユーザー情報
+        return result; // ユーザー情報
     }
 
     async existUser(email: string): Promise<boolean> {
