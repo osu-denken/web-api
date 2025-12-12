@@ -1,54 +1,12 @@
-import { 
-  txt2base64,
-  base642txt,
-  createJsonResponse,
-  createJsonResponseRaw,
-  sha256,
-  parseFrontMatter,
-  FMObj,
-  createFrontMatter
-} from "./util";
-
-const OWNER = "osu-denken";
-const REPO = "blog";
-const BRANCH = "main";
-
-export interface Env {
-	GITHUB_TOKEN: string;
-	AUTH_TOKEN: string;
-	FIREBASE_API_KEY: string;
-	DISCORD_INVITE: string;
-	REGISTER_PASSPHRASE: string;
-	GOOGLE_DRIVE_TOKEN: string;
-
-    BLOG_META: KVNamespace;
-	INVITE_CODE: KVNamespace;
-	LOGS: KVNamespace;
-}
-
-// blog api
-function requestGitHub(url: string, method: string, token: string, body?: any) {
-	const headers: Record<string, string> = {
-		"Authorization": `token ${token}`,
-		"Content-Type": "application/json",
-		"User-Agent": "osu-denken-admin-cloudflare-worker"
-	};
-	return fetch(url, {
-		method,
-		headers,
-		body: body ? JSON.stringify(body) : undefined
-	});
-}
-
-async function logInfo(request: Request, env: Env, type: string, message: string, ttl = 60 * 60 * 24 * 365) { // default: 365 days
-	await env.LOGS.put(`${type}:${Date.now()}`, JSON.stringify(
-		{ 
-		    message,
-		    ip: request.headers.get("CF-Connecting-IP") || "unknown",
-		    userAgent: request.headers.get("User-Agent") || "unknown",
-		}, null, 2
-	), { expirationTtl: ttl });
-}
+import { base642txt,
+  createJsonResponse, createJsonResponseRaw,
+  parseFrontMatter, createFrontMatter,
+  logInfo,
+  generateInviteCode,
+} from "./utils";
+import { Env } from "./types";
+import { GitHubService } from "./service/github";
+import { FirebaseService } from "./service/firebase";
 
 async function getFileFromDrive(env: Env, fileId: string) {
   const res = await fetch(`https://www.googleapis.com/drive/v3/files/${fileId}?alt=media`, {
@@ -61,153 +19,11 @@ async function getFileFromDrive(env: Env, fileId: string) {
   return await res.text();
 }
 
-// invite github organization
-async function inviteGitHubOrganization(env: Env, email: string) {
-	const url = `https://api.github.com/orgs/${OWNER}/invitations`;
-
-	const res = await fetch(url, {
-		method: "POST",
-		headers: {
-			"Authorization": `token ${env.GITHUB_TOKEN}`,
-			"Content-Type": "application/json",
-			"Accept": "application/vnd.github+json",
-			"User-Agent": "osu-denken-admin-cloudflare-worker"
-		},
-		body: JSON.stringify({
-			email,
-			role: "direct_member"
-		})
-	});
-
-	return res;
-}
-
-
-function getList(token: string) {
-	try {
-		const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts`;
-		return requestGitHub(url, "GET", token);
-	} catch (e) {
-		return Promise.reject(e);
-	}
-}
-
-function getPost(path: string, token: string) {
-	try {
-		const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts/${path}`;
-		return requestGitHub(url, "GET", token);
-	} catch (e) {
-		return Promise.reject(e);
-	}
-}
-
-async function updatePost(path: string, content: string, message: string, token: string, sha?: string) {
-	try {
-		const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts/${path}`;
-		const body: { message: string; content: string; branch: string; sha?: string } = {
-			message,
-			content: txt2base64(content),
-			branch: BRANCH
-		};
-		
-		if (sha) {
-			body.sha = sha;
-		} else {
-			const req = await requestGitHub(url, "GET", token);
-			if (req.status === 200) {
-				const data = await req.json() as { sha: string };
-				body.sha = data.sha;
-			}
-		}
-
-		return requestGitHub(url, "PUT", token, body);
-	} catch (e) {
-		return Promise.reject(e);
-	}
-}
-
-// user api
-async function registerUser(env: Env, email: string, password: string) {
-	const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signUp?key=${env.FIREBASE_API_KEY}`, {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json"
-		},
-		body: JSON.stringify({
-			email,
-			password,
-			returnSecureToken: true
-		})
-	});
-	const data = await res.json();
-	return data;
-}
-
-async function loginUser(env: Env, email: string, password: string) {
-	const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:signInWithPassword?key=${env.FIREBASE_API_KEY}`, {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json"
-		},
-		body: JSON.stringify({
-			email,
-			password,
-			returnSecureToken: true
-		})
-	});
-	const data = await res.json();
-
-	return data;
-}
-
-async function resetPassword(env: Env, email: string) {
-	const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:sendOobCode?key=${env.FIREBASE_API_KEY}`, {
-		method: "POST",
-		headers: {
-			"Content-Type": "application/json"
-		},
-		body: JSON.stringify({
-			requestType: "PASSWORD_RESET",
-			email
-		})
-	});
-	const data = await res.json();
-	return data;
-}
-
-async function verifyIdToken(env: Env, idToken: string) {
-	const res = await fetch(
-		`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${env.FIREBASE_API_KEY}`,
-		{
-			method: "POST",
-			headers: { "Content-Type": "application/json" },
-			body: JSON.stringify({ idToken })
-		}
-	);
-
-	const data: any = await res.json();
-
-	if (!res.ok || !data.users || data.users.length === 0) {
-		return data; // 無効
-	}
-
-	return data.users[0]; // ユーザー情報
-}
-
-function generateInviteCode(length = 8): string {
-    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
-    let code = "";
-    for (let i = 0; i < length; i++) {
-        code += chars[Math.floor(Math.random() * chars.length)];
-    }
-    return code;
-}
-
-
-
 export default {
 	async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
 		if (!env.GITHUB_TOKEN) return new Response("GITHUB_TOKEN is not set", { status: 500 });
+		const github = new GitHubService(env.GITHUB_TOKEN);
+		const firebase = new FirebaseService(env.FIREBASE_API_KEY);
 
 		const url = new URL(request.url);
 		const pathname: string = url.pathname;
@@ -252,30 +68,7 @@ export default {
 					email = `s` + email;
 				}
 
-				const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:lookup?key=${env.FIREBASE_API_KEY}`, {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json"
-					},
-					body: JSON.stringify({
-						email
-					})
-				});
-				const data: any = await res.json();
-
-				if (data.error) {
-					if (data.error.message === "EMAIL_NOT_FOUND") {
-						return createJsonResponseRaw({ exists: false });
-					} else {
-						return createJsonResponse(500, "Internal Server Error", { error: data.error.message });
-					}
-				}
-
-				if (data.users && data.users.length > 0) {
-					return createJsonResponseRaw({ exists: true });
-				} else {
-					return createJsonResponseRaw({ exists: false });
-				}
+				return createJsonResponseRaw({ exists: firebase.existUser(email) });
 			}
 
 			if (pathname === "/invite/create") {
@@ -289,7 +82,7 @@ export default {
 				}
 				idToken = idToken.replace("Bearer ", "");
 
-				const data: any = await verifyIdToken(env, idToken);
+				const data: any = await firebase.verifyIdToken(idToken);
 
 				if (!data) {
 					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
@@ -377,7 +170,7 @@ export default {
 					email = `s` + email;
 				}				
 
-				const data: any = await registerUser(env, email, password);
+				const data: any = await firebase.registerUser(email, password);
 				data.success = true;
 				
 				if (passphrase !== env.REGISTER_PASSPHRASE) 
@@ -410,7 +203,7 @@ export default {
 					email = `s` + email;
 				}
 
-				const data: any = await loginUser(env, email, password);
+				const data: any = await firebase.loginUser(email, password);
 
 				await logInfo(request, env, "login", `Login "${email}"`);
 
@@ -446,14 +239,7 @@ export default {
 				// メールアドレス
 				if (json.email) body.email = json.email;
 
-				const res = await fetch(`https://identitytoolkit.googleapis.com/v1/accounts:update?key=${env.FIREBASE_API_KEY}`, {
-					method: "POST",
-					headers: {
-						"Content-Type": "application/json"
-					},
-					body: JSON.stringify(body)
-				});
-				const data: any = await res.json();
+				const data: any = await firebase.updateUser(idToken, json.displayName, json.photoUrl, json.password);
 				data.success = true;
 
 				await logInfo(request, env, "update_user", `Update user "${data.localId}": ${JSON.stringify(body, null, 2)}`);
@@ -471,7 +257,7 @@ export default {
 					return createJsonResponse(400, "Bad Request", { error: "email is required" });
 				}
 
-				const data: any = await resetPassword(env, email);
+				const data: any = await firebase.resetPassword(email);
 				data.success = true;
 
 				await logInfo(request, env, "reset_password", `Reset password for "${email}"`);
@@ -491,7 +277,7 @@ export default {
 				}
 				idToken = idToken.replace("Bearer ", "");
 
-				const data: any = await verifyIdToken(env, idToken);
+				const data: any = await firebase.verifyIdToken(idToken);
 
 				if (!data) {
 					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
@@ -522,7 +308,7 @@ export default {
 				}
 				idToken = idToken.replace("Bearer ", "");
 
-				const verifyData: any = await verifyIdToken(env, idToken);
+				const verifyData: any = await firebase.verifyIdToken(idToken);
 
 				if (!verifyData) return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
 
@@ -548,7 +334,7 @@ export default {
 
 			// 記事一覧の取得
 			if (pathname === "/v1/blog/list") {
-				const res = await getList(env.GITHUB_TOKEN);
+				const res = await github.getList();
 				const data: any = await res.json();
 
 				const result = data.map((page: any) => ({
@@ -561,7 +347,7 @@ export default {
 			}
 
 			if (pathname === "/v2/blog/list") {
-				const res = await getList(env.GITHUB_TOKEN);
+				const res = await github.getList();
 				const data: any = await res.json();
 
 				for (const page of data) {
@@ -575,7 +361,7 @@ export default {
 						continue;
 					}
 
-					const postRes = await getPost(page.name, env.GITHUB_TOKEN);
+					const postRes = await github.getPost(page.name);
 					const postData: any = await postRes.json();
 
 					if (postData.content) {
@@ -616,7 +402,7 @@ export default {
 
 				page = `${page}.md`;
 
-				const res = await getPost(page, env.GITHUB_TOKEN);
+				const res = await github.getPost(page);
 				const data: any = await res.json();
 
 				if (!data.content) {
@@ -651,7 +437,7 @@ export default {
 				const cachedStr = await env.BLOG_META.get(kvKey);
 				let cached = cachedStr ? JSON.parse(cachedStr) : null;
 
-				const res = await getPost(fileName, env.GITHUB_TOKEN);
+				const res = await github.getPost(fileName);
 				const data: any = await res.json();
 
 				if (!data.content) {
@@ -727,7 +513,7 @@ export default {
 					return createJsonResponse(400, "Bad Request", { error: "email and password are required" });
 				}
 				
-				const data = await loginUser(env, email, password) as any;
+				const data = await firebase.loginUser(email, password) as any;
 				if (data.idToken) {
 			        return createJsonResponseRaw({ token: env.AUTH_TOKEN, success: true });
 				} else {
@@ -747,7 +533,7 @@ export default {
 				}
 				idToken = idToken.replace("Bearer ", "");
 
-				const data: any = await verifyIdToken(env, idToken);
+				const data: any = await firebase.verifyIdToken(idToken);
 
 				if (!data) {
 					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
@@ -767,7 +553,7 @@ export default {
 					return createJsonResponse(400, "Bad Request", { error: "page and content headers are required" });
 				}
 
-				const res = await updatePost(`${page}.md`, content as string, "Update post via Cloudflare Worker", env.GITHUB_TOKEN);
+				const res = await github.updatePost(`${page}.md`, content as string, "Update post via Cloudflare Worker");
 				const data2: any = await res.json();
 
 				data2.success = true;
@@ -788,7 +574,7 @@ export default {
 				}
 				idToken = idToken.replace("Bearer ", "");
 
-				const data: any = await verifyIdToken(env, idToken);
+				const data: any = await firebase.verifyIdToken(idToken);
 
 				if (!data) {
 					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
@@ -818,7 +604,7 @@ export default {
 
 				const content = createFrontMatter(meta, _content as string);
 
-				const res = await updatePost(`${page}.md`, content, "Update post via Cloudflare Worker", env.GITHUB_TOKEN);
+				const res = await github.updatePost(`${page}.md`, content, "Update post via Cloudflare Worker");
 				const data2: any = await res.json();
 
 				data2.success = true;
@@ -849,7 +635,7 @@ export default {
 				}
 				idToken = idToken.replace("Bearer ", "");
 
-				const data: any = await verifyIdToken(env, idToken);
+				const data: any = await firebase.verifyIdToken(idToken);
 
 				if (data.disabled) {
 					return createJsonResponse(403, "Forbidden", { error: "User account is disabled" });
@@ -876,7 +662,7 @@ export default {
 				}
 				idToken = idToken.replace("Bearer ", "");
 
-				const data: any = await verifyIdToken(env, idToken);
+				const data: any = await firebase.verifyIdToken(idToken);
 
 				if (!data) {
 					return createJsonResponse(401, "Unauthorized", { error: "Invalid idToken" });
@@ -887,7 +673,7 @@ export default {
 					return createJsonResponse(400, "Bad Request", { error: "email is required" });
 				}
 
-				const res = await inviteGitHubOrganization(env, email);
+				const res = await github.inviteOrganization(email);
 				const data2: any = await res.json();
 
 				if (!res.ok) {

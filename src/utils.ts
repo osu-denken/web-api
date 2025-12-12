@@ -1,3 +1,5 @@
+import { Env } from "./types";
+
 export interface FMObj {
   meta: Record<string, any>;
   content: string;
@@ -79,6 +81,16 @@ export function base642txt(base64: string) {
     return new TextDecoder().decode(bytes);
 }
 
+export async function logInfo(request: Request, env: Env, type: string, message: string, ttl = 60 * 60 * 24 * 365) { // default: 365 days
+	await env.LOGS.put(`${type}:${Date.now()}`, JSON.stringify(
+		{ 
+		    message,
+		    ip: request.headers.get("CF-Connecting-IP") || "unknown",
+		    userAgent: request.headers.get("User-Agent") || "unknown",
+		}, null, 2
+	), { expirationTtl: ttl });
+}
+
 export function createJsonResponse(status: number, statusText: string, body: any) {
 	return new Response(
 		JSON.stringify(
@@ -123,4 +135,13 @@ export function sha256(data: string): Promise<string> {
 
 export function die(msg: string) {
 	return createJsonResponse(500, "Internal Server Error", { error: msg });
+}
+
+export function generateInviteCode(length = 8): string {
+    const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+    let code = "";
+    for (let i = 0; i < length; i++) {
+        code += chars[Math.floor(Math.random() * chars.length)];
+    }
+    return code;
 }
