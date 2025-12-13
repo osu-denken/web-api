@@ -50,7 +50,7 @@ export class PortalController extends IController {
         const verifyData: any = await this.firebase?.verifyIdToken(this.authorization);
 
         const email: string = verifyData.email;
-        if (!email.endsWith("@ge.osaka-sandai.ac.jp")) throw HttpError.createBadRequest("Email must be from osaka-sandai.ac.jp domain");
+        if (!email.endsWith("@ge.osaka-sandai.ac.jp")) throw HttpError.createBadRequest("Email must be from ge.osaka-sandai.ac.jp domain");
 
         const row = await this.members_googlesheets.getRowsByHeader("main", "A1:K100");
         if (!row) throw HttpError.createNotFound(`All members not found`);
