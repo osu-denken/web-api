@@ -1,12 +1,12 @@
 import { Env } from "./util/types";
 import { HttpError } from "./util/HttpError";
-import { UserController } from "./api/UserController";
-import { IController } from "./api/IController";
-import { FirebaseService } from "./service/firebase";
-import { GitHubService } from "./service/github";
-import { InviteController } from "./api/InviteController";
-import { BlogController } from "./api/BlogController";
-import { PortalController } from "./api/PortalController";
+import { UserController } from "./control/UserController";
+import { IController } from "./control/IController";
+import { FirebaseService } from "./util/service/firebase";
+import { GitHubService } from "./util/service/github";
+import { InviteController } from "./control/InviteController";
+import { BlogController } from "./control/BlogController";
+import { PortalController } from "./control/PortalController";
 
 export default {
 	async fetch(request: Request, env: Env, ctx: any): Promise<Response> {

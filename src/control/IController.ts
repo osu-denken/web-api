@@ -1,5 +1,5 @@
-import { FirebaseService } from "../service/firebase";
-import { GitHubService } from "../service/github";
+import { FirebaseService } from "../util/service/firebase";
+import { GitHubService } from "../util/service/github";
 
 export abstract class IController {
     public path: string[];

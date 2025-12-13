@@ -1,6 +1,6 @@
-import { CustomHttpError } from "../util/CustomHttpError";
-import { HttpError } from "../util/HttpError";
-import { base642txt, parseFrontMatter, txt2base64 } from "../util/utils";
+import { CustomHttpError } from "../CustomHttpError";
+import { HttpError } from "../HttpError";
+import { base642txt, parseFrontMatter, txt2base64 } from "../utils";
 
 const OWNER = "osu-denken";
 const REPO = "blog";

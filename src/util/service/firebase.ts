@@ -1,4 +1,4 @@
-import { HttpError } from "../util/HttpError";
+import { HttpError } from "../HttpError";
 
 const BASE_URL = "https://identitytoolkit.googleapis.com/v1/accounts";
 
