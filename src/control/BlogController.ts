@@ -51,9 +51,9 @@ export class BlogController extends IController {
         const res = await this.github.getList();
         const posts: any[] = await res.json();
 
-        for (const page of posts) {
-            page.name = page.name.replace(".md", "");
-            page.meta = await this.getMetaCached(page.name);
+        for (const post of posts) {
+            post.name = post.name.replace(".md", "");
+            post.meta = await this.getMetaCached(post.name, post);
         }
 
         return createJsonResponse(
