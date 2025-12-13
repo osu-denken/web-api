@@ -1,10 +1,12 @@
 import { FirebaseService } from "../util/service/firebase";
 import { GitHubService } from "../util/service/github";
+import { GoogleSheetsService } from "../util/service/googlesheets";
 
 export abstract class IController {
     public path: string[];
     public firebase: FirebaseService | null = null;
     public github: GitHubService | null = null;
+    public members_googlesheets: GoogleSheetsService | null = null;
 
     public request: Request | null = null;
     public authorization: string | null = null;
@@ -36,9 +38,10 @@ export abstract class IController {
         });
     }
 
-    public setServices(firebase: FirebaseService | null, github: GitHubService | null) {
+    public setServices(firebase: FirebaseService | null, github: GitHubService | null, members_googlesheets: GoogleSheetsService | null) {
         this.firebase = firebase;
         this.github = github;
+        this.members_googlesheets = members_googlesheets;
     }
 
     public setRequest(request: Request) {
