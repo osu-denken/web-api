@@ -11,6 +11,13 @@ export class BlogController extends IController {
     public constructor(path: string[]) {
         super(path);
 
+        if (path.length < 3) {
+            let tmp = path[1];
+            path[0] = "v2";
+            path[1] = "blog";
+            path[2] = tmp;
+        }
+
         if (path.length < 2) {
             path[0] = "v2";
             path[1] = "blog";
