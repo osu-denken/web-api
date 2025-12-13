@@ -1,5 +1,6 @@
 import * as jose from 'jose';
 import { HttpError } from "../HttpError";
+import { CustomHttpError } from '../CustomHttpError';
 
 const BASE_URL = "https://sheets.googleapis.com/v4/spreadsheets";
 
@@ -72,7 +73,7 @@ export class GoogleSheetsService {
     public async getValuesByRange(range: string) {
         const res = await this.request(`values/${range}`, "GET");
         if (!res.ok) 
-            throw HttpError.createInternalServerError("Failed to fetch sheet data");
+            throw new CustomHttpError(res.status, res.statusText, "Failed to fetch sheet data", res);
 
         const data: any = await res.json();
         return data.values; 
