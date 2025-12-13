@@ -1,6 +1,5 @@
 # OSU-Denken Web API
-
-大阪産業大学 電子計算研究部の [電研公式サイト](https://osu-denken.github.io/) のバックエンド API
+大阪産業大学 電子計算研究部の [電研公式サイト](https://osu-denken.github.io/) のバックエンド API <br />
 Cloudflare Workers上で稼働しています。
 
 ## 機能
