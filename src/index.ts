@@ -38,7 +38,6 @@ export default {
 
 		let controller: IController | null = null;
 
-
 		// v1 / v2がある場合
 		let base = path[0];
 		if (base === "v1" || base === "v2" && path.length >= 2) {
@@ -60,7 +59,6 @@ export default {
 			const firebase = new FirebaseService(env.FIREBASE_API_KEY);
 
 			if (pathname === "/") return new Response("Welcome to osu-denken api!", { status: 200 });
-			if (path[0] === "ping") return new Response("pong", { status: 200 });
 
 			if (controller) {
 				controller.setServices(firebase, github);
