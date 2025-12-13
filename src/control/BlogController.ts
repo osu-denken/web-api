@@ -76,7 +76,7 @@ export class BlogController extends IController {
         const slug = this.url?.searchParams.get("page");
         if (!slug) throw HttpError.createBadRequest("Query parameter 'page' is required");
 
-        const post: any = this.github.getPost(slug);
+        const post: any = await this.github.getPost(slug);
         
         const cacheKey = `meta:${slug}`;
         await this.env.BLOG_META.put(cacheKey, JSON.stringify({ sha: post.sha, meta: post.meta }));
