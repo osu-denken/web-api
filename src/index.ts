@@ -7,6 +7,19 @@ import { GitHubService } from "./util/service/github";
 import { InviteController } from "./control/InviteController";
 import { BlogController } from "./control/BlogController";
 import { PortalController } from "./control/PortalController";
+import { PingController } from "./control/PingController";
+
+type ControllerFactory = (path: string[]) => IController;
+
+const routes: Record<string, ControllerFactory> = {
+  "ping" : (path) => new PingController(path),
+  "user": (path) => new UserController(path),
+  "blog": (path) => new BlogController(path),
+  "invite": (path) => new InviteController(path),
+  "portal": (path) => new PortalController(path),
+  "discord": (path) => new PortalController(path),
+  "github": (path) => new PortalController(path),
+};
 
 export default {
 	async fetch(request: Request, env: Env, ctx: any): Promise<Response> {
@@ -21,9 +34,22 @@ export default {
 			}});
 		}
 
-		const path: string[] = pathname.split("/");
+		const path = pathname.split("/").filter(Boolean);
 
 		let controller: IController | null = null;
+
+
+		// v1 / v2がある場合
+		let base = path[0];
+		if (base === "v1" || base === "v2" && path.length >= 2) {
+			base = path[1];
+		}
+
+		const factory = routes[base];
+		if (factory) {
+			controller = factory(path);
+		}
+
 		let authorization = request.headers.get("Authorization") ?? null;
 
 		try {
@@ -35,16 +61,6 @@ export default {
 
 			if (pathname === "/") return new Response("Welcome to osu-denken api!", { status: 200 });
 			if (path[0] === "ping") return new Response("pong", { status: 200 });
-			if (path[0] === "user") controller = new UserController(path);
-			if (path[0] === "blog") controller = new BlogController(path);
-			if (path[0] === "invite") controller = new InviteController(path);
-
-			// TODO: versioning, impl in IController
-			if (path[0] === "v1" && path[1] === "blog") controller = new BlogController(path);
-			if (path[0] === "v2" && path[1] === "blog") controller = new BlogController(path);
-
-			// TODO: split
-			if (path[0] === "portal" || path[0] === "discord" || path[0] === "github") controller = new PortalController(path);
 
 			if (controller) {
 				controller.setServices(firebase, github);

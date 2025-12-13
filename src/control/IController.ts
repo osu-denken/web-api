@@ -21,13 +21,18 @@ export abstract class IController {
      * ルーティング
      */
     public abstract route() : Promise<any> | any;
+    
+    private async isJsonBody(body: unknown) {
+        return body !== null && typeof body === "object";
+    }
 
     public async toResponse() {
-        return new Response(await this.route(), {
+        const res = await this.route();
+        if (res instanceof Response)
+            return res;
+
+        return new Response(res, {
             status: 200,
-            headers: {
-				"Content-Type": "application/json",
-            }
         });
     }
 
