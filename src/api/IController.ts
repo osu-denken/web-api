@@ -17,10 +17,13 @@ export abstract class IController {
         this.path = path;
     }
 
-    public abstract route() : any;
+    /**
+     * ルーティング
+     */
+    public abstract route() : Promise<any> | any;
 
-    public toResponse() {
-        return new Response(this.route(), {
+    public async toResponse() {
+        return new Response(await this.route(), {
             status: 200,
             headers: {
 				"Content-Type": "application/json",

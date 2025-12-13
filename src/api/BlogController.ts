@@ -35,29 +35,33 @@ export class BlogController extends IController {
         if (this.path[0] === "v2") {
             if (this.path[2] == "list") return this.getList();
             if (this.path[2] == "post") return this.getPost();
-            if (this.path[2] == "update") throw this.updatePost();
+            if (this.path[2] == "update") return this.updatePost();
         }
 
         throw HttpError.createNotFound("Endpoint not found");
     }
 
+    /**
+     * 記事の一覧を取得する
+     * @returns JsonResponse
+     */
     public async getList() {
         if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
 
         const res = await this.github.getList();
-        const data: any[] = await res.json();
+        const posts: any[] = await res.json();
 
-        for (const page of data) {
+        for (const page of posts) {
             page.name = page.name.replace(".md", "");
             page.meta = await this.getMetaCached(page.name);
         }
 
         return createJsonResponse(
-            data.map(page => ({
-                name: page.name,
-                sha: page.sha,
-                size: page.size,
-                meta: page.meta
+            posts.map(post => ({
+                name: post.name,
+                sha: post.sha,
+                size: post.size,
+                meta: post.meta
             }))
         );
     }
