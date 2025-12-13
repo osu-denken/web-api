@@ -44,6 +44,7 @@ export class PortalController extends IController {
      * 名簿データ一覧を返す (部員内であっても取り扱いに注意すること)
      */
     public async members() {
+        // TODO: キャッシュ
         if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
