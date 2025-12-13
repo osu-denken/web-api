@@ -55,7 +55,7 @@ export class PortalController extends IController {
 
         studentId = studentId.toUpperCase();
 
-        const row = await this.members_googlesheets.findRow("main", "A2:K100", 1, studentId);
+        const row = await this.members_googlesheets.findRow("main", "A2:K100", 0, studentId);
         if (!row) throw HttpError.createNotFound(`Member ${studentId} not found`);
 
         return createJsonResponse(row);
