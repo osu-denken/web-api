@@ -1,5 +1,5 @@
 import { HttpError } from "../util/HttpError";
-import { createJsonResponseRaw, generateInviteCode, logInfo } from "../util/utils";
+import { createJsonResponse, generateInviteCode, logInfo } from "../util/utils";
 import { IController } from "./IController";
 
 export class InviteController extends IController {    
@@ -29,9 +29,9 @@ export class InviteController extends IController {
         const localId = await this.env.INVITE_CODE.get(code);
 
         if (!localId)
-            return createJsonResponseRaw({ valid: false });
+            return createJsonResponse({ valid: false });
         
-        return createJsonResponseRaw({ valid: true, localId });
+        return createJsonResponse({ valid: true, localId });
     }
 
     public async create() {
@@ -46,7 +46,7 @@ export class InviteController extends IController {
         await this.env.INVITE_CODE.put(code, data.localId, { expirationTtl: 86400 });
         await logInfo(this.request, this.env, "invite", `Create invite-code "${code}" by ${data.localId}: ${code}`);
 
-        return createJsonResponseRaw({ code, success: true });
+        return createJsonResponse({ code, success: true });
     }
 
     public async delete() {
@@ -62,6 +62,6 @@ export class InviteController extends IController {
         await this.env.INVITE_CODE.delete(code);
         await logInfo(this.request, this.env, "invite", `Delete invite-code "${code}" by ${data.localId}: ${code}`);
         
-        return createJsonResponseRaw({ success: true });
+        return createJsonResponse({ success: true });
     }
 }

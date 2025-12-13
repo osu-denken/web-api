@@ -1,6 +1,6 @@
 import { CustomHttpError } from "../util/CustomHttpError";
 import { HttpError } from "../util/HttpError";
-import { base642txt, createJsonResponseRaw, parseFrontMatter } from "../util/utils";
+import { base642txt, createFrontMatter, createJsonResponse, logInfo, parseFrontMatter } from "../util/utils";
 import { IController } from "./IController";
 
 export class BlogController extends IController {    
@@ -20,22 +20,141 @@ export class BlogController extends IController {
 
     public route() {
         if (this.path[0] === "v1") {
-            if (this.path[2] == "list") return this.list();
-            if (this.path[2] == "post") return this.getPost();
-            if (this.path[2] == "update") throw HttpError.createNotImplemented("Update post not implemented in v1");
+            if (this.path[2] == "list") return this.getList_old();
+            if (this.path[2] == "post") return this.getPost_old();
+            if (this.path[2] == "update") return this.updatePost_old();
         }
 
         if (this.path[0] === "v2") {
-            if (this.path[2] == "list") return this.list2();
-            if (this.path[2] == "post") return this.getPost2();
-            if (this.path[2] == "update") throw HttpError.createNotImplemented("Update post not implemented in v2");
+            if (this.path[2] == "list") return this.getList();
+            if (this.path[2] == "post") return this.getPost();
+            if (this.path[2] == "update") throw this.updatePost();
         }
 
         throw HttpError.createNotFound("Endpoint not found");
     }
 
-    public async list() {
-        if (this.github == null) throw HttpError.createInternalServerError("GitHub service not initialized");
+    public async getList() {
+        if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
+
+        const res = await this.github.getList();
+        const data: any[] = await res.json();
+
+        for (const page of data) {
+            page.name = page.name.replace(".md", "");
+            page.meta = await this.getMetaCached(page.name);
+        }
+
+        return createJsonResponse(
+            data.map(page => ({
+                name: page.name,
+                sha: page.sha,
+                size: page.size,
+                meta: page.meta
+            }))
+        );
+    }
+
+    /**
+     * 記事のデータを取得する
+     * @returns JsonResponse
+     */
+    public async getPost() {
+        if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
+
+        const slug = this.url?.searchParams.get("page");
+        if (!slug) throw HttpError.createBadRequest("Query parameter 'page' is required");
+
+        const post: any = this.github.getPost(slug);
+        
+        const cacheKey = `meta:${slug}`;
+        await this.env.BLOG_META.put(cacheKey, JSON.stringify({ sha: post.sha, meta: post.meta }));
+
+        return createJsonResponse({
+            name: post.name,
+            sha: post.sha,
+            size: post.size,
+            meta: post.meta,
+            content: post.content
+        });
+    }
+
+    /**
+     * 記事を更新する
+     * @returns JsonResponse
+     */
+    public async updatePost() {
+        if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
+        if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
+        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
+
+        const data: any = await this.firebase?.verifyIdToken?(this.authorization) : null;
+
+        const page = this.request.headers.get("page");
+        const _meta = this.request.headers.get("meta");
+        const _content = this.request.headers.get("content") || await this.request.text();
+        
+        if (!page || !_content || !_meta) throw HttpError.createBadRequest("page, meta and content headers are required");
+        
+        let meta: any = {};
+        try {
+            meta = JSON.parse(_meta);
+        } catch (e) {
+            throw HttpError.createBadRequest("meta header is not valid JSON");
+        }
+
+        const content = createFrontMatter(meta, _content as string);
+
+        const res = await this.github.updatePost(`${page}.md`, content, "Update post via Cloudflare Worker");
+        const data2: any = await res.json();
+
+        data2.success = true;
+
+        await logInfo(this.request, this.env, "blog_update", `Update blog post "${page}" by ${data.localId}`);
+
+        const kvKey = `meta:${page}`;
+        await this.env.BLOG_META.put(
+            kvKey,
+            JSON.stringify({
+                sha: data2.content.sha,
+                meta: meta
+            })
+        );
+        
+        return createJsonResponse(data2);
+    }
+
+    /**
+     * 記事のメタデータを取得する
+     * @param slug ページ名
+     * @param post 記事のデータ
+     * @returns メタデータ
+     */
+    private async getMetaCached(slug: string, post?: any) {
+        const cacheKey = `meta:${slug}`;
+        const cachedStr = await this.env.BLOG_META.get(cacheKey);
+        const cached = cachedStr ? JSON.parse(cachedStr) : null;
+
+        if (!post) {
+            const res = await this.github!.getPostRaw(`${slug}.md`);
+            post = await res.json();
+            if (!post.content) return {};
+        }
+        const sha = post.sha;
+        if (cached?.sha === sha) return cached.meta;
+
+        let content = post.content;
+        if (post.encoding === "base64") 
+            content = base642txt(content);
+
+        const meta = parseFrontMatter(content).meta || {};
+        await this.env.BLOG_META.put(cacheKey, JSON.stringify({ sha, meta }));
+
+        return meta;
+    }
+
+    public async getList_old() {
+        if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
 
         const res = await this.github.getList();
         const data: any = await res?.json();
@@ -46,68 +165,17 @@ export class BlogController extends IController {
             size: page.size
         }));
 
-        return createJsonResponseRaw(result);
-    }
-
-    public async list2() {
-        if (this.github == null) throw HttpError.createInternalServerError("GitHub service not initialized");
-
-        const res = await this.github.getList();
-        const data: any = await res.json();
-
-        for (const page of data) {
-            const kvKey = `meta:${page.name.replace(".md", "")}`;
-
-            const cachedStr = await this.env.BLOG_META.get(kvKey);
-            let cached = cachedStr ? JSON.parse(cachedStr) : null;
-
-            if (cached && cached.sha === page.sha) {
-                page.meta = cached.meta;
-                continue;
-            }
-
-            const postRes = await this.github.getPost(page.name);
-            const postData: any = await postRes.json();
-
-            if (postData.content) {
-                let content = postData.content;
-                if (postData.encoding === "base64") {
-                    content = base642txt(content);
-                }
-
-                const parsed = parseFrontMatter(content);
-                page.meta = parsed.meta || {};
-
-                await this.env.BLOG_META.put(
-                    kvKey,
-                    JSON.stringify({
-                        sha: page.sha,
-                        meta: page.meta
-                    })
-                );
-            } else {
-                page.meta = {};
-            }
-        }
-
-        const result = data.map((page: any) => ({
-            name: page.name.replace(".md", ""),
-            sha: page.sha,
-            size: page.size,
-            meta: page.meta
-        }));
-        
-        return createJsonResponseRaw(result);
+        return createJsonResponse(result);
     }
     
-    public async getPost() {
-        if (this.github == null) throw HttpError.createInternalServerError("GitHub service not initialized");
+    public async getPost_old() {
+        if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
 
-        let page = this.url?.searchParams.get("page") || "";
-        if (page === "") throw HttpError.createBadRequest("Query parameter 'page' is required");
-        page = `${page}.md`;
+        let slug = this.url?.searchParams.get("page") || "";
+        if (slug === "") throw HttpError.createBadRequest("Query parameter 'page' is required");
+        slug = `${slug}.md`;
 
-        const res = await this.github.getPost(page);
+        const res = await this.github.getPostRaw(slug);
         const data: any = await res.json();
 
         if (!data.content) throw new CustomHttpError(404, "NOT_FOUND", "Post not found", data);
@@ -116,67 +184,33 @@ export class BlogController extends IController {
         if (data.encoding && data.encoding === "base64")
             content = base642txt(content);
         
-        return createJsonResponseRaw({
-            name: page.replace(".md", ""),
+        return createJsonResponse({
+            name: slug.replace(".md", ""),
             sha: data.sha,
             size: data.size,
             content: content
         });
     }
+    
+    public async updatePost_old() {
+        if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
+        if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
+        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
-    public async getPost2() {
-        if (this.github == null) throw HttpError.createInternalServerError("GitHub service not initialized");
+        const data: any = await this.firebase?.verifyIdToken?(this.authorization) : null;
 
-        let page = this.url?.searchParams.get("page") || "";
-        if (page === "") throw HttpError.createBadRequest("Query parameter 'page' is required");
+        const page = this.request.headers.get("page");
+        const content = this.request.headers.get("content") || await this.request.text();
         
-        const filename = `${page}.md`;
-        const cacheKey = `meta:${page}`;
+        if (!page || !content) throw HttpError.createBadRequest("page and content headers are required");
 
-        const cachedStr = await this.env.BLOG_META.get(cacheKey);
-        let cached = cachedStr ? JSON.parse(cachedStr) : null;
+        const res = await this.github.updatePost(`${page}.md`, content, "Update post via Cloudflare Worker");
+        const data2: any = await res.json();
 
-        const res = await this.github.getPost(filename);
-        const data: any = await res?.json();
+        data2.success = true;
 
-        if (!data.content) throw new CustomHttpError(404, "NOT_FOUND", "Post not found", data);
+        await logInfo(this.request, this.env, "blog_update", `Update blog post "${page}" by ${data.localId}`);
 
-        if (cached && cached.sha === data.sha) {
-            let content = data.content;
-            if (data.encoding && data.encoding === "base64")
-                content = base642txt(content);
-            
-            const parsed = parseFrontMatter(content);
-
-            return createJsonResponseRaw({
-                name: data.name.replace(".md", ""),
-                sha: data.sha,
-                size: data.size,
-                meta: cached.meta,
-                content: parsed.content || content
-            });
-        }
-
-        let content = data.content;
-        if (data.encoding && data.encoding === "base64")
-            content = base642txt(content);
-        
-        const parsed = parseFrontMatter(content);
-
-        await this.env.BLOG_META.put(
-            cacheKey,
-            JSON.stringify({
-                sha: data.sha,
-                meta: parsed.meta || {}
-            })
-        );
-
-        return createJsonResponseRaw({
-            name: data.name.replace(".md", ""),
-            sha: data.sha,
-            size: data.size,
-            meta: parsed.meta || {},
-            content: parsed.content || content
-        });
+        return createJsonResponse(data2);
     }
 }

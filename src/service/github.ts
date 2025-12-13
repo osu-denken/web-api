@@ -1,5 +1,6 @@
+import { CustomHttpError } from "../util/CustomHttpError";
 import { HttpError } from "../util/HttpError";
-import { txt2base64 } from "../util/utils";
+import { base642txt, parseFrontMatter, txt2base64 } from "../util/utils";
 
 const OWNER = "osu-denken";
 const REPO = "blog";
@@ -38,7 +39,11 @@ export class GitHubService {
         }
     }
 
-    async getPost(path: string) {
+    /**
+     * 
+     * @param path  パス .mdを含む
+     */
+    async getPostRaw(path: string) {
         try {
             const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts/${path}`;
             const res = await this.request(url, "GET");
@@ -49,6 +54,31 @@ export class GitHubService {
         } catch (e) {
             return Promise.reject(e);
         }
+    }
+
+    /**
+     * split content and meta
+     * @param slug ページ名
+     * @returns 記事データ
+     */
+    async getPost(slug: string) {
+        const filename = `${slug}.md`;
+
+        const res = await this.getPostRaw(filename);
+        const post: any = await res.json();
+
+        if (!post.content) throw new CustomHttpError(404, "NOT_FOUND", "Post not found", post);
+        
+        let source = post.content;
+        if (post.encoding && post.encoding === "base64")
+            source = base642txt(source);
+
+        const parsed = parseFrontMatter(source);
+
+        post.content = parsed.content;
+        post.meta = parsed.meta;
+
+        return post;
     }
 
     async updatePost(path: string, content: string, message: string, sha?: string) {

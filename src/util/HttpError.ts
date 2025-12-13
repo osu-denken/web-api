@@ -1,4 +1,4 @@
-import { createJsonResponse2, createJsonResponseRaw } from "./utils";
+import { createJsonResponse2, createJsonResponse } from "./utils";
 
 export class HttpError extends Error {
     public status: number;

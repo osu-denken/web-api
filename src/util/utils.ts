@@ -5,16 +5,16 @@ export interface FMObj {
   content: string;
 }
 
-export function parseFrontMatter(md: string): FMObj {
-  const res: FMObj = { meta: {}, content: md };
+export function parseFrontMatter(source: string): FMObj {
+  const res: FMObj = { meta: {}, content: source };
 
-  if (!md.startsWith('---')) return res;
+  if (!source.startsWith('---')) return res;
 
-  const endIndex = md.indexOf('---', 3);
+  const endIndex = source.indexOf('---', 3);
   if (endIndex === -1) return res;
 
-  const metaString = md.slice(3, endIndex).trim();
-  const body = md.slice(endIndex + 3).trim();
+  const metaString = source.slice(3, endIndex).trim();
+  const body = source.slice(endIndex + 3).trim();
 
   const lines = metaString.split('\n');
 
@@ -126,7 +126,7 @@ export function createResponse(status: number, body: any) {
 	);
 }
 
-export function createJsonResponseRaw(data: any) {
+export function createJsonResponse(data: any) {
     return new Response(JSON.stringify(data, null, 2), {
         status: 200,
         headers: {
