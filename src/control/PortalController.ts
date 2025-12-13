@@ -14,6 +14,7 @@ export class PortalController extends IController {
     public route() {
         if (this.path[0] === "portal" && this.path.length === 1) return this.portal();
         if (this.path[0] === "portal" && this.path[1] === "members") return this.members();
+        if (this.path[0] === "portal" && this.path[1] === "memberCount") return this.memberCount();
         if (this.path[0] === "portal" && this.path[1] === "member" && this.path[2] === "me") return this.memberMe();
         if (this.path[0] === "github" && this.path[1] === "invite") return this.githubInvite();
         if (this.path[0] === "discord" && this.path[1] === "invite") return this.discordInvite();
@@ -80,6 +81,17 @@ export class PortalController extends IController {
 
         return createJsonResponse(row);
     }
+
+    /**
+     * 部員数を取得する
+     */
+    public async memberCount() {
+        if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
+
+        const row = await this.members_googlesheets.getValues("main", "A2", "A100");
+        return createJsonResponse(row.length);
+    }
+        
 
     /**
      * GitHub Organizationに招待する
