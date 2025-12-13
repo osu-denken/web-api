@@ -55,6 +55,7 @@ export default {
 		try {
 			if (!env.GITHUB_TOKEN) throw new HttpError(500, "INTERNAL_SERVER_ERROR", "GITHUB_TOKEN is not set");
 			if (!env.FIREBASE_API_KEY) throw new HttpError(500, "INTERNAL_SERVER_ERROR", "FIREBASE_API_KEY is not set");
+			if (!env.MEMBERS_SPREADSHEET_ID) throw new HttpError(500, "INTERNAL_SERVER_ERROR", "MEMBERS_SPREADSHEET_ID is not set");
 
 			const github = new GitHubService(env.GITHUB_TOKEN);
 			const firebase = new FirebaseService(env.FIREBASE_API_KEY);

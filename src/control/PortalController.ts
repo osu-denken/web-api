@@ -12,9 +12,10 @@ export class PortalController extends IController {
     }
 
     public route() {
-        if (this.path[0] === "portal") return this.postPortal();
-        if (this.path[0] === "github" && this.path[1] === "invite") return this.postGithubInvite();
-        if (this.path[0] === "discord" && this.path[1] === "invite") return this.postDiscordInvite();
+        if (this.path[0] === "portal" && this.path.length === 1) return this.portal();
+        if (this.path[0] === "portal" && this.path[1] === "members") return this.members();
+        if (this.path[0] === "github" && this.path[1] === "invite") return this.githubInvite();
+        if (this.path[0] === "discord" && this.path[1] === "invite") return this.discordInvite();
 
         throw HttpError.createNotFound("Endpoint not found");
     }
@@ -22,19 +23,11 @@ export class PortalController extends IController {
     /**
      * 部員ポータル用にまとめた情報を返す
      */
-    public async postPortal() {
+    public async portal() {
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
         const verifyData: any = await this.firebase?.verifyIdToken(this.authorization);
-
-        if (!verifyData || (verifyData.error && verifyData.error.message === "INVALID_ID_TOKEN")) {
-            throw new HttpError(401, "UNAUTHORIZED", "Invalid idToken");
-        }
-
-        if (verifyData.disabled) {
-            throw new HttpError(403, "FORBIDDEN", "User account is disabled");
-        }
 
         return createJsonResponse({
             success: true,
@@ -47,9 +40,26 @@ export class PortalController extends IController {
     }
 
     /**
+     * 部員一覧を返す
+     */
+    public async members() {
+        if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
+        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
+
+        const verifyData: any = await this.firebase?.verifyIdToken(this.authorization);
+
+        const email = verifyData.email;
+        const studentId = email.split("@")[0];
+
+        const row = await this.members_googlesheets.findRow("main", "A2:K100", 1, studentId);
+
+        return createJsonResponse(row);
+    }
+
+    /**
      * GitHub Organizationに招待する
      */
-    public async postGithubInvite() {
+    public async githubInvite() {
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
@@ -77,7 +87,7 @@ export class PortalController extends IController {
     /**
      * Discordの招待コードを返す
      */
-    public async postDiscordInvite() {
+    public async discordInvite() {
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 

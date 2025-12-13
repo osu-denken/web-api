@@ -111,4 +111,28 @@ export class GoogleSheetsService {
         if (!res.ok) throw HttpError.createInternalServerError("Failed to append");
         return res.json();
     }
+
+    /**
+     * 指定列で検索して該当行を返す
+     * @param sheet シート名
+     * @param range 範囲 (例: "A1:C100")
+     * @param columnIndex 検索する列の0始まりインデックス
+     * @param value 検索する値
+     */
+    public async findRow(sheet: string, range: string, columnIndex: number, value: string) {
+        const data = await this.getValuesByRange(`${sheet}!${range}`);
+        if (!data) return null;
+
+        return data.find((row: string[]) => row[columnIndex] === value) ?? null;
+    }
+
+    /**
+     * 指定列で検索して該当行のインデックスを返す
+     */
+    public async findRowIndex(sheet: string, range: string, columnIndex: number, value: string) {
+        const data = await this.getValuesByRange(`${sheet}!${range}`);
+        if (!data) return -1;
+
+        return data.findIndex((row: string[]) => row[columnIndex] === value);
+    }
 }
