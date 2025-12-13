@@ -14,6 +14,7 @@ export class PortalController extends IController {
     public route() {
         if (this.path[0] === "portal" && this.path.length === 1) return this.portal();
         if (this.path[0] === "portal" && this.path[1] === "members") return this.members();
+        if (this.path[0] === "portal" && this.path[1] === "member" && this.path[2] === "me") return this.memberMe();
         if (this.path[0] === "github" && this.path[1] === "invite") return this.githubInvite();
         if (this.path[0] === "discord" && this.path[1] === "invite") return this.discordInvite();
 
@@ -40,9 +41,27 @@ export class PortalController extends IController {
     }
 
     /**
-     * 部員一覧を返す
+     * 名簿データ一覧を返す (部員内であっても取り扱いに注意すること)
      */
     public async members() {
+        if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
+        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
+
+        const verifyData: any = await this.firebase?.verifyIdToken(this.authorization);
+
+        const email: string = verifyData.email;
+        if (!email.endsWith("@osaka-sandai.ac.jp")) throw HttpError.createBadRequest("Email must be from osaka-sandai.ac.jp domain");
+
+        const row = await this.members_googlesheets.getRowsByHeader("main", "A1:K100");
+        if (!row) throw HttpError.createNotFound(`All members not found`);
+
+        return createJsonResponse(row);
+    }
+
+    /**
+     * ユーザの名簿データを返す
+     */
+    public async memberMe() {
         if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
@@ -55,7 +74,7 @@ export class PortalController extends IController {
 
         studentId = studentId.toUpperCase();
 
-        const row = await this.members_googlesheets.findRow("main", "A2:K100", 0, studentId);
+        const row = await this.members_googlesheets.findRowByHeader("main", "A1:K100", "num", studentId);
         if (!row) throw HttpError.createNotFound(`Member ${studentId} not found`);
 
         return createJsonResponse(row);

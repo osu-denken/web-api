@@ -136,4 +136,50 @@ export class GoogleSheetsService {
 
         return data.findIndex((row: string[]) => row[columnIndex] === value);
     }
+
+    /**
+     * 範囲を取得して1行目をキーとしたオブジェクトとして返す
+     * @param sheet シート名
+     * @param range データ範囲（ヘッダー含む）
+     * @param searchColumnKey 検索列のヘッダー名
+     * @param value 検索する値
+     */
+    public async findRowByHeader(
+        sheet: string,
+        range: string,
+        searchColumnKey: string,
+        value: string
+    ) {
+        const data = await this.getValuesByRange(`${sheet}!${range}`);
+        if (!data || data.length < 2) return null;
+
+        const headers = data[0]; // 1行目をキー
+        const rows = data.slice(1);
+
+        const row = rows.find((row: string[]) => row[headers.indexOf(searchColumnKey)] === value);
+        if (!row) return null;
+
+        const obj: Record<string, string> = {};
+        headers.forEach((h: any, i: any) => obj[h] = row[i]);
+        return obj;
+    }
+
+    /**
+     * 1行目をキーにして範囲をオブジェクトの配列で返す
+     * @param sheet シート名
+     * @param range データ範囲（ヘッダー含む）
+     */
+    public async getRowsByHeader(sheet: string, range: string) {
+        const data = await this.getValuesByRange(`${sheet}!${range}`);
+        if (!data || data.length < 2) return [];
+
+        const headers = data[0]; // 1行目をキー
+        const rows = data.slice(1);
+
+        return rows.map((row: string[]) => {
+            const obj: Record<string, string> = {};
+            headers.forEach((h: any, i: any) => obj[h] = row[i] ?? "");
+            return obj;
+        });
+    }
 }
