@@ -28,13 +28,13 @@ export class BlogController extends IController {
     public route() {
         if (this.path[0] === "v1") {
             if (this.path[2] == "list") return this.getList_old();
-            if (this.path[2] == "post") return this.getPost_old();
+            if (this.path[2] == "get") return this.getPost_old();
             if (this.path[2] == "update") return this.updatePost_old();
         }
 
         if (this.path[0] === "v2") {
             if (this.path[2] == "list") return this.getList();
-            if (this.path[2] == "post") return this.getPost();
+            if (this.path[2] == "get") return this.getPost();
             if (this.path[2] == "update") return this.updatePost();
         }
 
