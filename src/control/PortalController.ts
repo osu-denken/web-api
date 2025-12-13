@@ -52,10 +52,11 @@ export class PortalController extends IController {
         let studentId = email.split("@")[0];
         if (studentId.startsWith("s"))
             studentId = studentId.slice(1);
-        
+
         studentId = studentId.toUpperCase();
 
         const row = await this.members_googlesheets.findRow("main", "A2:K100", 1, studentId);
+        if (!row) throw HttpError.createNotFound(`Member ${studentId} not found`);
 
         return createJsonResponse(row);
     }
