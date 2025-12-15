@@ -78,7 +78,7 @@ export class PortalController extends IController {
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
         const data: any = await this.firebase?.verifyIdToken(this.authorization);
-        await this.checkPermissionByEmail(data.email);
+        // await this.checkPermissionByEmail(data.email);
 
         let studentId = data.email.split("@")[0];
         // if (studentId.startsWith("s"))
