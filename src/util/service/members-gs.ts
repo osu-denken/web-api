@@ -37,7 +37,7 @@ export class MembersGSheetsService extends GoogleSheetsService {
         const index: string[] = [];
         for (let row of rows) {
             const studentId: string = "s" + (row.num as string);
-            index.push(studentId);
+            index.push(studentId.toLowerCase());
             await this.env.MEMBERS.put(studentId.toLowerCase(), JSON.stringify(row), { expirationTtl: 86400 });
         }
 
