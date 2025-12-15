@@ -49,6 +49,8 @@ export class MembersGSheetsService extends GoogleSheetsService {
 
         const row = await super.findRowByHeader("main", "A1:K100", "num", studentId);
         if (!row) throw HttpError.createNotFound(`Member ${studentId} not found`);
+
+        return row;
     }
 
     public async getMemberWithCache(studentId: string) {
