@@ -80,7 +80,13 @@ export default {
 				return e.toResponse();
 			}
 			
-			return new HttpError(500, "INTERNAL_SERVER_ERROR", JSON.stringify(e, null, 2)).toResponse();
+			return new HttpError(500, "INTERNAL_SERVER_ERROR", 
+				JSON.stringify({
+					name: e?.name,
+					message: e?.message,
+					stack: e?.stack,
+				}, null, 2)
+			).toResponse();
 		}
 	}
 } satisfies ExportedHandler<Env>;
