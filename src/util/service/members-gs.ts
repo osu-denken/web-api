@@ -20,15 +20,15 @@ export class MembersGSheetsService extends GoogleSheetsService {
     }
 
     public async getMembersWithCache() {
-        const indexJson = await this.env.MEMBERS.get("_index", { type: "json" });
+        const indexJson = await this.env.MEMBERS.get("_index");
         if (indexJson && Array.isArray(indexJson)) {
             const members = await Promise.all(indexJson.map((key: string) => 
-                this.env.MEMBERS.get(`${key}`, { type: "json" })));
+                this.env.MEMBERS.get(`${key}`)));
 
             return members.filter(Boolean);
         }
 
-        const index :string[] = [];
+        const index: string[] = [];
         const rows: any = await this.getMembers();
         for (let row of rows) {
             const studentId: string = "s" + (row.num as string);
