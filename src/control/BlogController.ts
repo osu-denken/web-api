@@ -100,7 +100,7 @@ export class BlogController extends IController {
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
         const data: any = await this.firebase?.verifyIdToken?(this.authorization) : null;
-        this.checkPermissionByEmail(data.email);
+        await this.checkPermissionByEmail(data.email);
 
         const page = this.request.headers.get("page");
         const _meta = this.request.headers.get("meta");
@@ -210,7 +210,7 @@ export class BlogController extends IController {
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
         const data: any = await this.firebase?.verifyIdToken?(this.authorization) : null;
-        this.checkPermissionByEmail(data.email);
+        await this.checkPermissionByEmail(data.email);
 
         const page = this.request.headers.get("page");
         const content = this.request.headers.get("content") || await this.request.text();

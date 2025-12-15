@@ -30,7 +30,7 @@ export class PortalController extends IController {
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
         const data: any = await this.firebase?.verifyIdToken(this.authorization);
-        this.checkPermissionByEmail(data.email);
+        await this.checkPermissionByEmail(data.email);
 
         return createJsonResponse({
             success: true,
@@ -50,12 +50,24 @@ export class PortalController extends IController {
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
         const data: any = await this.firebase?.verifyIdToken(this.authorization);
-        this.checkPermissionByEmail(data.email);
+        await this.checkPermissionByEmail(data.email);
 
         const members = await this.members_googlesheets.getMembersWithCache();
         const response = createJsonResponse(members);
 
         return response;
+    }
+
+    /**
+     * パーミッションチェック
+     */
+    public async hasPermission() {
+        const studentId = this.url?.searchParams.get("id");
+        if (!studentId) throw HttpError.createBadRequest("param has not id");
+
+        await this.checkPermission(studentId);
+
+        return new Response("yes");
     }
 
     /**
@@ -66,7 +78,7 @@ export class PortalController extends IController {
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
         const data: any = await this.firebase?.verifyIdToken(this.authorization);
-        this.checkPermissionByEmail(data.email);
+        await this.checkPermissionByEmail(data.email);
 
         let studentId = data.email.split("@")[0];
         // if (studentId.startsWith("s"))
@@ -100,7 +112,7 @@ export class PortalController extends IController {
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
         const data: any = await this.firebase?.verifyIdToken(this.authorization);
-        this.checkPermissionByEmail(data.email);
+        await this.checkPermissionByEmail(data.email);
 
         if (!data) throw new HttpError(401, "UNAUTHORIZED", "Invalid idToken");
 
@@ -130,7 +142,7 @@ export class PortalController extends IController {
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
         const data: any = await this.firebase?.verifyIdToken(this.authorization);
-        this.checkPermissionByEmail(data.email);
+        await this.checkPermissionByEmail(data.email);
 
         if (data.disabled) {
             throw new HttpError(403, "FORBIDDEN", "User account is disabled");
