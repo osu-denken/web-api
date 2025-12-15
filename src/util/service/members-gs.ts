@@ -20,9 +20,9 @@ export class MembersGSheetsService extends GoogleSheetsService {
     }
 
     public async getMembersWithCache() {
-        const indexJson = await this.env.MEMBERS.get("_index");
-        if (indexJson && Array.isArray(indexJson)) {
-            const members = await Promise.all(indexJson.map((key: string) => 
+        const _index = await this.env.MEMBERS.get("_index");
+        if (_index) {
+            const members = await Promise.all(JSON.parse(_index).map((key: string) => 
                 this.env.MEMBERS.get(`${key}`)));
 
             return members.filter(Boolean);
