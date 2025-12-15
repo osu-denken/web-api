@@ -22,6 +22,14 @@
 		{
 			"binding": "LOGS",
 			"id": "4b5aae44f15440df8ae2cd1ba1736f6d"
+		},
+		{
+			"binding": "MEMBERS",
+			"id": "03419c416a9c4b58ae7361476feee612"
+		},
+		{
+			"binding": "CACHE",
+			"id": "1cbe2bb9c077469f85cebbaaf88b618d"
 		}
 	]
 	/**

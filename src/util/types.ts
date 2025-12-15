@@ -15,4 +15,5 @@ export interface Env {
 	INVITE_CODE: KVNamespace;
 	LOGS: KVNamespace;
 	MEMBERS: KVNamespace;
+	CACHE: KVNamespace;
 }
