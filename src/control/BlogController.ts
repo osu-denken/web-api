@@ -147,7 +147,7 @@ export class BlogController extends IController {
         const cachedStr = await this.env.BLOG_META.get(cacheKey);
         const cached = cachedStr ? JSON.parse(cachedStr) : null;
 
-        if (!post) {
+        if (!post || (post && !post.content)) {
             const res = await this.github!.getPostRaw(`${slug}.md`);
             post = await res.json();
             if (!post.content) return {};
