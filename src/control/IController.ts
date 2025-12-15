@@ -86,7 +86,8 @@ export abstract class IController {
      * 権限があるか、なければエラーを出す
      * @param email 大学付与のメールアドレス
      */
-    public async checkPermissionByEmail(email: string) {
+    public async checkPermissionByEmail(email?: string) {
+        if (!email) throw HttpError.createUnauthorized("Email is required for permission check");
         if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
         if (!email.endsWith("@ge.osaka-sandai.ac.jp")) throw HttpError.createBadRequest("Email must be from ge.osaka-sandai.ac.jp domain");
 
