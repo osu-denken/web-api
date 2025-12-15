@@ -159,6 +159,7 @@ export class BlogController extends IController {
         if (post.encoding === "base64") 
             content = base642txt(content);
 
+        if (!content) throw new CustomHttpError(404, "NOT_FOUND", "Post content not found", post);
         const meta = parseFrontMatter(content).meta || {};
         await this.env.BLOG_META.put(cacheKey, JSON.stringify({ sha, meta }));
 
