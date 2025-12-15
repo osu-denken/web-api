@@ -55,8 +55,8 @@ export class MembersGSheetsService extends GoogleSheetsService {
         if (studentId.startsWith("s"))
             studentId = studentId.slice(1);
 
-        const cache = this.env.MEMBERS.get("s" + studentId);
-        if (cache) return cache;
+        const cache = await this.env.MEMBERS.get("s" + studentId);
+        if (cache) return JSON.parse(cache);
 
         const row = await this.getMember(studentId);
         await this.env.MEMBERS.put("s" + studentId, JSON.stringify(row), { expirationTtl: 86400 });
