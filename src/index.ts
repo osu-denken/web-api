@@ -8,7 +8,7 @@ import { InviteController } from "./control/InviteController";
 import { BlogController } from "./control/BlogController";
 import { PortalController } from "./control/PortalController";
 import { PingController } from "./control/PingController";
-import { GoogleSheetsService as GoogleSheetsService } from "./util/service/googlesheets";
+import { MembersGSheetsService } from "./util/service/members-gs";
 
 type ControllerFactory = (path: string[]) => IController;
 
@@ -59,7 +59,7 @@ export default {
 
 			const github = new GitHubService(env.GITHUB_TOKEN);
 			const firebase = new FirebaseService(env.FIREBASE_API_KEY);
-			const members_googlesheets = new GoogleSheetsService(env.GOOGLE_SA_KEY, env.MEMBERS_SPREADSHEET_ID);
+			const members_googlesheets = new MembersGSheetsService(env.GOOGLE_SA_KEY, env.MEMBERS_SPREADSHEET_ID, ctx, env);
 
 			if (pathname === "/") return new Response("Welcome to osu-denken web-api!", { status: 200 });
 
@@ -69,6 +69,7 @@ export default {
 				controller.setAuthorization(authorization);
 				controller.setEnv(env);
 				controller.setUrl(url);
+				controller.setCtx(ctx);
 				return await controller.toResponse();
 			}
 

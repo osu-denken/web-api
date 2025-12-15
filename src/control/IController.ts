@@ -1,17 +1,19 @@
 import { FirebaseService } from "../util/service/firebase";
 import { GitHubService } from "../util/service/github";
-import { GoogleSheetsService } from "../util/service/googlesheets";
+import { MembersGSheetsService } from "../util/service/members-gs";
 
 export abstract class IController {
     public path: string[];
     public firebase: FirebaseService | null = null;
     public github: GitHubService | null = null;
-    public members_googlesheets: GoogleSheetsService | null = null;
+    public members_googlesheets: MembersGSheetsService | null = null;
 
     public request: Request | null = null;
     public authorization: string | null = null;
     public env: any = null;
     public url: URL | null = null;
+
+    public ctx: any = null;
 
     public abstract getParentPath(): string;
 
@@ -38,7 +40,7 @@ export abstract class IController {
         });
     }
 
-    public setServices(firebase: FirebaseService | null, github: GitHubService | null, members_googlesheets: GoogleSheetsService | null) {
+    public setServices(firebase: FirebaseService | null, github: GitHubService | null, members_googlesheets: MembersGSheetsService | null) {
         this.firebase = firebase;
         this.github = github;
         this.members_googlesheets = members_googlesheets;
@@ -63,4 +65,8 @@ export abstract class IController {
 	public setUrl(url: URL) {
         this.url = url;
 	}
+
+    public setCtx(ctx: any) {
+        this.ctx = ctx;
+    }
 }

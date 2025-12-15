@@ -14,4 +14,5 @@ export interface Env {
     BLOG_META: KVNamespace;
 	INVITE_CODE: KVNamespace;
 	LOGS: KVNamespace;
+	MEMBERS: KVNamespace;
 }

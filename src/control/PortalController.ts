@@ -45,7 +45,6 @@ export class PortalController extends IController {
      * 名簿データ一覧を返す (部員内であっても取り扱いに注意すること)
      */
     public async members() {
-        // TODO: キャッシュ
         if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
@@ -54,10 +53,9 @@ export class PortalController extends IController {
         const email: string = verifyData.email;
         if (!email.endsWith("@ge.osaka-sandai.ac.jp")) throw HttpError.createBadRequest("Email must be from ge.osaka-sandai.ac.jp domain");
 
-        const row = await this.members_googlesheets.getRowsByHeader("main", "A1:K100");
-        if (!row) throw HttpError.createNotFound(`All members not found`);
+        const response = createJsonResponse(this.members_googlesheets.getMembersWithCache());
 
-        return createJsonResponse(row);
+        return response;
     }
 
     /**
@@ -71,15 +69,15 @@ export class PortalController extends IController {
 
         const email = verifyData.email;
         let studentId = email.split("@")[0];
-        if (studentId.startsWith("s"))
-            studentId = studentId.slice(1);
+        // if (studentId.startsWith("s"))
+            // studentId = studentId.slice(1);
 
-        studentId = studentId.toUpperCase();
+        // studentId = studentId.toUpperCase();
 
-        const row = await this.members_googlesheets.findRowByHeader("main", "A1:K100", "num", studentId);
-        if (!row) throw HttpError.createNotFound(`Member ${studentId} not found`);
+        // const row = await this.members_googlesheets.findRowByHeader("main", "A1:K100", "num", studentId);
+        // if (!row) throw HttpError.createNotFound(`Member ${studentId} not found`);
 
-        return createJsonResponse(row);
+        return createJsonResponse(this.members_googlesheets.getMemberWithCache(studentId));
     }
 
     /**
@@ -88,8 +86,8 @@ export class PortalController extends IController {
     public async memberCount() {
         if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
 
-        const row = await this.members_googlesheets.getValues("main", "A2", "A100");
-        return createJsonResponse(row.length);
+        const rows = await this.members_googlesheets.getMembersWithCache();
+        return createJsonResponse(rows.length);
     }
         
 
