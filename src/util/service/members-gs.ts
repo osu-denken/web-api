@@ -20,20 +20,25 @@ export class MembersGSheetsService extends GoogleSheetsService {
     }
 
     public async getMembersWithCache() {
-        const _index = await this.env.MEMBERS.get("_index");
-        if (_index) {
-            const members = await Promise.all(JSON.parse(_index).map((key: string) => 
-                this.env.MEMBERS.get(`${key}`)));
+        const cacheIndex = await this.env.MEMBERS.get("_index");
 
-            return members.filter(Boolean);
+        if (cacheIndex) {
+            const keys: string[] = JSON.parse(cacheIndex);
+            const members = await Promise.all(
+                keys.map(key => this.env.MEMBERS.get(key))
+            );
+
+            return members
+                .filter(Boolean)
+                .map(v => JSON.parse(v as string));
         }
 
-        const index: string[] = [];
         const rows: any = await this.getMembers();
+        const index: string[] = [];
         for (let row of rows) {
             const studentId: string = "s" + (row.num as string);
             index.push(studentId);
-            this.env.MEMBERS.put(studentId.toLowerCase(), JSON.stringify(row), { expirationTtl: 86400 });
+            await this.env.MEMBERS.put(studentId.toLowerCase(), JSON.stringify(row), { expirationTtl: 86400 });
         }
 
         await this.env.MEMBERS.put("_index", JSON.stringify(index), { expirationTtl: 86400 });
