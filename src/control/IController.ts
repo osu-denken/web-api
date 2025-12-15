@@ -1,3 +1,4 @@
+import { HttpError } from "../util/HttpError";
 import { FirebaseService } from "../util/service/firebase";
 import { GitHubService } from "../util/service/github";
 import { MembersGSheetsService } from "../util/service/members-gs";
@@ -68,5 +69,27 @@ export abstract class IController {
 
     public setCtx(ctx: any) {
         this.ctx = ctx;
+    }
+    
+    /**
+     * 権限があるか、なければエラーを出す
+     * @param studentId 学籍番号
+     */
+    public async checkPermission(studentId: string) {
+        if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
+
+        const member: any = await this.members_googlesheets.hasPermission(studentId);
+        if (member.permit !== "1") throw HttpError.createForbidden("You are not have permissions");
+    }
+
+    /**
+     * 権限があるか、なければエラーを出す
+     * @param email 大学付与のメールアドレス
+     */
+    public async checkPermissionByEmail(email: string) {
+        if (!email.endsWith("@ge.osaka-sandai.ac.jp")) throw HttpError.createBadRequest("Email must be from ge.osaka-sandai.ac.jp domain");
+
+        const member: any = await this.members_googlesheets?.hasPermissionByEmail(email);
+        if (member.permit !== "1") throw HttpError.createForbidden("You are not have permissions");
     }
 }

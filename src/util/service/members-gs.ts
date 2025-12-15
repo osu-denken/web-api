@@ -63,5 +63,30 @@ export class MembersGSheetsService extends GoogleSheetsService {
 
         return row;
     }
+    
+    /**
+     * 権限があるか
+     * @param studentId 学籍番号
+     * @returns 
+     */
+    public async hasPermission(studentId: string): Promise<boolean> {
+        // if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
+
+        const member: any = await this.getMemberWithCache(studentId);
+        return member.permit === "1";
+    }
+
+    /**
+     * 権限があるか
+     * @param email 大学付与のメールアドレス
+     * @returns boolean
+     */
+    public async hasPermissionByEmail(email: string): Promise<boolean> {
+        // if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
+
+        let studentId = email.split("@")[0];       
+        const member: any = await this.getMemberWithCache(studentId);
+        return member.permit === "1";
+    }
 
 }

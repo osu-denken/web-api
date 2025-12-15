@@ -29,11 +29,12 @@ export class PortalController extends IController {
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
-        const verifyData: any = await this.firebase?.verifyIdToken(this.authorization);
+        const data: any = await this.firebase?.verifyIdToken(this.authorization);
+        this.checkPermissionByEmail(data.email);
 
         return createJsonResponse({
             success: true,
-            user: verifyData,
+            user: data,
             limits: {
                 discordInviteCode: this.env.DISCORD_INVITE,
             },
@@ -48,12 +49,11 @@ export class PortalController extends IController {
         if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
-        const verifyData: any = await this.firebase?.verifyIdToken(this.authorization);
+        const data: any = await this.firebase?.verifyIdToken(this.authorization);
+        this.checkPermissionByEmail(data.email);
 
-        const email: string = verifyData.email;
-        if (!email.endsWith("@ge.osaka-sandai.ac.jp")) throw HttpError.createBadRequest("Email must be from ge.osaka-sandai.ac.jp domain");
-
-        const response = createJsonResponse(this.members_googlesheets.getMembersWithCache());
+        const members = await this.members_googlesheets.getMembersWithCache();
+        const response = createJsonResponse(members);
 
         return response;
     }
@@ -65,10 +65,10 @@ export class PortalController extends IController {
         if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
-        const verifyData: any = await this.firebase?.verifyIdToken(this.authorization);
+        const data: any = await this.firebase?.verifyIdToken(this.authorization);
+        this.checkPermissionByEmail(data.email);
 
-        const email = verifyData.email;
-        let studentId = email.split("@")[0];
+        let studentId = data.email.split("@")[0];
         // if (studentId.startsWith("s"))
             // studentId = studentId.slice(1);
 
@@ -76,8 +76,9 @@ export class PortalController extends IController {
 
         // const row = await this.members_googlesheets.findRowByHeader("main", "A1:K100", "num", studentId);
         // if (!row) throw HttpError.createNotFound(`Member ${studentId} not found`);
+        const member: any = await this.members_googlesheets.getMemberWithCache(studentId);
 
-        return createJsonResponse(this.members_googlesheets.getMemberWithCache(studentId));
+        return createJsonResponse(member);
     }
 
     /**
@@ -99,6 +100,8 @@ export class PortalController extends IController {
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
         const data: any = await this.firebase?.verifyIdToken(this.authorization);
+        this.checkPermissionByEmail(data.email);
+
         if (!data) throw new HttpError(401, "UNAUTHORIZED", "Invalid idToken");
 
         const { email } = await this.request.json() as { email: string };
@@ -127,6 +130,7 @@ export class PortalController extends IController {
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
         const data: any = await this.firebase?.verifyIdToken(this.authorization);
+        this.checkPermissionByEmail(data.email);
 
         if (data.disabled) {
             throw new HttpError(403, "FORBIDDEN", "User account is disabled");

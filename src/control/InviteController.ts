@@ -39,6 +39,7 @@ export class InviteController extends IController {
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
         const data: any = await this.firebase?.verifyIdToken?(this.authorization) : null;
+        this.checkPermissionByEmail(data.email);
         
         const code = generateInviteCode(12);
 
@@ -54,6 +55,7 @@ export class InviteController extends IController {
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
         const data: any = await this.firebase?.verifyIdToken?(this.authorization) : null;
+        this.checkPermissionByEmail(data.email);
         
         const { code } = await this.request.json() as { code: string };
 
