@@ -78,8 +78,8 @@ export abstract class IController {
     public async checkPermission(studentId: string) {
         if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
 
-        const member: any = await this.members_googlesheets.hasPermission(studentId);
-        if (member.permit !== "1") throw HttpError.createForbidden("You are not have permissions");
+        const hasPermission: boolean = await this.members_googlesheets.hasPermission(studentId);
+        if (!hasPermission) throw HttpError.createForbidden("You are not have permissions");
     }
 
     /**
@@ -87,9 +87,10 @@ export abstract class IController {
      * @param email 大学付与のメールアドレス
      */
     public async checkPermissionByEmail(email: string) {
+        if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
         if (!email.endsWith("@ge.osaka-sandai.ac.jp")) throw HttpError.createBadRequest("Email must be from ge.osaka-sandai.ac.jp domain");
 
-        const member: any = await this.members_googlesheets?.hasPermissionByEmail(email);
-        if (member.permit !== "1") throw HttpError.createForbidden("You are not have permissions");
+        const hasPermission: boolean = await this.members_googlesheets.hasPermissionByEmail(email);
+        if (!hasPermission) throw HttpError.createForbidden("You are not have permissions");
     }
 }
