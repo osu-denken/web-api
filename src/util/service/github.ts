@@ -133,12 +133,12 @@ export class GitHubService {
     public async getStaticPageRaw(slug: string) {
         GitHubService.checkSafePath(slug);
 
-        const filename = `${slug}.md`;
+        const filename = `${slug}`;
 
         const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${filename}`;
         const res = await this.request(url, "GET");
 
-        if (res.status === 404) throw new HttpError(404, "NOT_FOUND", "Post not found");
+        if (res.status === 404) throw new HttpError(404, "NOT_FOUND", "Static page not found");
 
         const post: any = await res.json();
         

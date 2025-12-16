@@ -87,7 +87,7 @@ export class BlogController extends IController {
                 continue;
             
             page.name = page.name.replace(".md", "");
-            page.meta = await this.getMetaCached(page.name, page);
+            page.meta = await this.getMetaStaticPageCached(page.name, page);
         }
 
         return createJsonResponse(
@@ -194,6 +194,36 @@ export class BlogController extends IController {
             content = base642txt(content);
 
         if (!content) throw new CustomHttpError(404, "NOT_FOUND", "Post content not found", post);
+        const meta = parseFrontMatter(content).meta || {};
+        await this.env.BLOG_META.put(cacheKey, JSON.stringify({ sha, meta }));
+
+        return meta;
+    }
+
+    /**
+     * 固定ページのメタデータを取得する
+     * @param slug ページ名
+     * @param page 固定のデータ
+     * @returns メタデータ
+     */
+    private async getMetaStaticPageCached(slug: string, page?: any) {
+        const cacheKey = `meta:${slug}`;
+        const cachedStr = await this.env.BLOG_META.get(cacheKey);
+        const cached = cachedStr ? JSON.parse(cachedStr) : null;
+
+        if (!page || (page && !page.content)) {
+            const res = await this.github!.getStaticPageRaw(`${slug}.md`);
+            page = await res.json();
+            if (!page.content) return {};
+        }
+        const sha = page.sha;
+        if (cached?.sha === sha) return cached.meta;
+
+        let content = page.content;
+        if (page.encoding === "base64") 
+            content = base642txt(content);
+
+        if (!content) throw new CustomHttpError(404, "NOT_FOUND", "Page content not found", page);
         const meta = parseFrontMatter(content).meta || {};
         await this.env.BLOG_META.put(cacheKey, JSON.stringify({ sha, meta }));
 
