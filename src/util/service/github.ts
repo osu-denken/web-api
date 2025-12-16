@@ -9,7 +9,7 @@ const BRANCH = "main";
 export class GitHubService {
     private token: string;
 
-    constructor(token: string) {
+    public constructor(token: string) {
         this.token = token;
     }
 
@@ -24,6 +24,26 @@ export class GitHubService {
             headers,
             body: body ? JSON.stringify(body) : undefined
         });
+    }
+
+    /**
+     * ディレクトリトラバーサル対策
+     * @param path ページ名
+     * @param denySlash スラッシュ / を拒否するかどうか
+     */
+    private static async checkSafePath(path: string, denySlash: boolean = false) {
+        // 英数字ハイフンスラッシュのみを許可する
+        // if (!/^[a-zA-Z0-9\-\/]+$/.test(slug))
+        //     throw new HttpError(400, "INVALID_SLUG", "Invalid slug");
+
+        // / を拒否
+        if (denySlash && path.includes("/")) 
+            throw new HttpError(400, "INVALID_SLUG", "Using slash in slug is deny");
+        
+
+        // ../ を拒否
+        if (path.includes(".."))
+            throw new HttpError(400, "INVALID_SLUG", "Path traversal detected");
     }
 
     /**
@@ -62,7 +82,7 @@ export class GitHubService {
 
     /**
      * 
-     * @param path  パス .mdを含む
+     * @param path パス .mdを含む
      */
     public async getPostRaw(path: string) {
         await GitHubService.checkSafePath(path);
@@ -77,6 +97,34 @@ export class GitHubService {
         } catch (e) {
             return Promise.reject(e);
         }
+    }
+
+    /**
+     * 固定ページの取得
+     * @param path 固定ページのパス .mdを含む
+     * @returns ソース
+     */
+    public async getStaticPageRaw(path: string) {
+        await GitHubService.checkSafePath(path);
+
+        const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`;
+        const res = await this.request(url, "GET");
+
+        if (res.status === 404) 
+            throw new HttpError(404, "NOT_FOUND", "Static page not found");
+
+        let page: any;
+        try {
+            page = await res.json();
+        } catch {
+            throw new CustomHttpError(500, "INTERNAL_SERVER_ERROR", "Internal server error", JSON.stringify(res, null, 2));
+        }
+        
+        let source = page.content;
+        if (page.encoding && page.encoding === "base64")
+            source = base642txt(source);
+
+        return page;
     }
 
     /**
@@ -100,51 +148,6 @@ export class GitHubService {
 
         post.content = parsed.content;
         post.meta = parsed.meta;
-
-        return post;
-    }
-
-    /**
-     * ディレクトリトラバーサル対策
-     * @param path ページ名
-     * @param denySlash スラッシュ / を拒否するかどうか
-     */
-    private static async checkSafePath(path: string, denySlash: boolean = false) {
-        // 英数字ハイフンスラッシュのみを許可する
-        // if (!/^[a-zA-Z0-9\-\/]+$/.test(slug))
-        //     throw new HttpError(400, "INVALID_SLUG", "Invalid slug");
-
-        // / を拒否
-        if (denySlash && path.includes("/")) 
-            throw new HttpError(400, "INVALID_SLUG", "Using slash in slug is deny");
-        
-
-        // ../ を拒否
-        if (path.includes(".."))
-            throw new HttpError(400, "INVALID_SLUG", "Path traversal detected");
-    }
-
-
-    /**
-     * 固定ページの取得
-     * @param slug 固定ページ名
-     * @returns ソース
-     */
-    public async getStaticPageRaw(slug: string) {
-        await GitHubService.checkSafePath(slug);
-
-        const filename = `${slug}`;
-
-        const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${filename}`;
-        const res = await this.request(url, "GET");
-
-        if (res.status === 404) throw new HttpError(404, "NOT_FOUND", "Static page not found");
-
-        const post: any = await res.json();
-        
-        let source = post.content;
-        if (post.encoding && post.encoding === "base64")
-            source = base642txt(source);
 
         return post;
     }
