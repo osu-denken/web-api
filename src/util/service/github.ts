@@ -116,7 +116,7 @@ export class GitHubService {
         let page: any;
         try {
             page = await res.json();
-        } catch {
+        } catch(e) {
             throw new CustomHttpError(500, "INTERNAL_SERVER_ERROR", "Internal server error", JSON.stringify(res, null, 2));
         }
         
