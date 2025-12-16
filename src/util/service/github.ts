@@ -200,7 +200,7 @@ export class GitHubService {
         try {
             const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts/${filename}`;
             const body: { message: string; content: string; branch: string; sha?: string } = {
-                message,
+                message: message,
                 content: txt2base64(content),
                 branch: BRANCH
             };
@@ -239,5 +239,82 @@ export class GitHubService {
         });
 
         return res;
+    }
+
+    /**
+     * ファイルをアップロードする
+     * @param path パス
+     * @param contentBase64 base64エンコードしたデータ
+     * @param message コミットメッセージ
+     * @returns 
+     */
+    public async uploadFile(path: string, contentBase64: string, message: string = "Upload file via Cloudflare Worker") {
+        const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`
+        const body: { message: string; content: string; branch: string; sha?: string } = {
+            message: message,
+            content: contentBase64,
+            branch :BRANCH
+        };
+
+        const req = await this.request(url, "GET");
+        if (req.status === 200) {
+            const data = await req.json() as { sha: string };
+            body.sha = data.sha;
+        }
+
+        return this.request(url, "PUT", body);
+    }
+
+    /**
+     * 画像をアップロードする (images/)
+     * @param filename ファイル名
+     * @param contentBase64 base64エンコードしたデータ
+     * @param message コミットメッセージ
+     * @returns 
+     */
+    public async uploadImage(filename: string, contentBase64: string, message: string = "Upload image via Cloudflare Worker") {
+        await GitHubService.checkSafePath(filename, true);
+        return this.uploadFile(`images/${filename}`, contentBase64, message);
+    }
+    
+    /**
+     * ファイルの SHA を取得する
+     * @param path ファイルパス
+     */
+    private async getSha(path: string): Promise<string> {
+        const res = await this.request(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`, "GET");
+        if (!res.ok) {
+            throw new CustomHttpError(res.status, "NOT_FOUND", "File not found", await res.text());
+        }
+        const data = await res.json() as { sha: string };
+        return data.sha;
+    }
+
+    /**
+     * ファイルを削除する
+     * @param path ファイルパス
+     * @param sha ハッシュ値
+     * @param message コミットメッセージ
+     */
+    public async deleteFile(path: string, sha?: string, message: string = "Delete file via Cloudflare Worker") {
+        await GitHubService.checkSafePath(path, true);
+
+    if (!sha) sha = await this.getSha(path);
+
+        const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`;
+        const body = { message, sha, branch: BRANCH };
+
+        return this.request(url, "DELETE", body);
+    }
+
+    /**
+     * 画像を削除する
+     * @param filename images/ 配下のファイル名
+     * @param sha GitHub 上の SHA
+     * @param message コミットメッセージ
+     */
+    public async deleteImage(filename: string, sha?: string, message: string = "Delete image via Cloudflare Worker") {
+        await GitHubService.checkSafePath(filename, true);
+        return this.deleteFile(`images/${filename}`, sha, message);
     }
 }

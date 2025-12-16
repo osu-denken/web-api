@@ -9,6 +9,7 @@ import { BlogController } from "./control/BlogController";
 import { PortalController } from "./control/PortalController";
 import { PingController } from "./control/PingController";
 import { MembersGSheetsService } from "./util/service/members-gs";
+import { ImageController } from "./control/ImageController";
 
 type ControllerFactory = (path: string[]) => IController;
 
@@ -17,6 +18,7 @@ const routes: Record<string, ControllerFactory> = {
   "user": (path) => new UserController(path),
   "blog": (path) => new BlogController(path),
   "invite": (path) => new InviteController(path),
+  "image": (path) => new ImageController(path),
   "portal": (path) => new PortalController(path),
   "discord": (path) => new PortalController(path),
   "github": (path) => new PortalController(path),

@@ -65,11 +65,11 @@ export function FMObj2FrontMatterString(fm: FMObj): string {
 
 export function txt2base64(str: string) {
 	const bytes = new TextEncoder().encode(str);
-	let binary = '';
+	let bin = '';
 	for (let i = 0; i < bytes.length; i++) {
-		binary += String.fromCharCode(bytes[i]);
+		bin += String.fromCharCode(bytes[i]);
 	}
-	return btoa(binary);
+	return btoa(bin);
 }
 
 export function base642txt(base64: string) {
@@ -80,6 +80,19 @@ export function base642txt(base64: string) {
     }
     return new TextDecoder().decode(bytes);
 }
+
+export function arrayBuffer2base64(buffer: ArrayBuffer) {
+    let bin = "";
+    const bytes = new Uint8Array(buffer);
+    const chunkSize = 0x8000;
+
+    for (let i = 0; i < bytes.length; i += chunkSize) {
+        bin += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+    }
+
+    return btoa(bin);
+}
+
 
 export async function logInfo(request: Request, env: Env, type: string, message: string, ttl = 60 * 60 * 24 * 365) { // default: 365 days
 	await env.LOGS.put(`${type}:${Date.now()}`, JSON.stringify(
