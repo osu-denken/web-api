@@ -65,7 +65,7 @@ export class GitHubService {
      * @param path  パス .mdを含む
      */
     public async getPostRaw(path: string) {
-        GitHubService.checkSafePath(path);
+        await GitHubService.checkSafePath(path);
 
         try {
             const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts/${path}`;
@@ -131,7 +131,7 @@ export class GitHubService {
      * @returns ソース
      */
     public async getStaticPageRaw(slug: string) {
-        GitHubService.checkSafePath(slug);
+        await GitHubService.checkSafePath(slug);
 
         const filename = `${slug}`;
 
@@ -158,7 +158,7 @@ export class GitHubService {
      * @returns 
      */
     public async updateStaticPage(slug: string, content: string, message: string = "Update static page via Cloudflare Worker", sha?: string) {
-        GitHubService.checkSafePath(slug, true);
+        await GitHubService.checkSafePath(slug, true);
 
         const filename = `${slug}.md`;
 
@@ -195,7 +195,7 @@ export class GitHubService {
      * @returns 
      */
     public async updatePost(slug: string, content: string, message: string = "Update post via Cloudflare Worker", sha?: string) {
-        GitHubService.checkSafePath(slug);
+        await GitHubService.checkSafePath(slug);
 
         const filename = `${slug}.md`;
 
