@@ -27,13 +27,16 @@ export class BlogController extends IController {
 
     public route() {
         if (this.path[0] === "v1") {
-            if (this.path[2] == "list") return this.getList_old();
-            if (this.path[2] == "get") return this.getPost_old();
-            if (this.path[2] == "update") return this.updatePost_old();
+            if (this.path[2] == "list") return this.getListV1();
+            if (this.path[2] == "get") return this.getPostV1();
+            if (this.path[2] == "get-static") return this.getStaticPageV1();
+            if (this.path[2] == "update") return this.updatePostV1();
+            if (this.path[2] == "update-static") return this.updateStaticPageV1();
         }
 
         if (this.path[0] === "v2") {
-            if (this.path[2] == "list") return this.getList();
+            if (this.path[2] == "list") return this.getPostList();
+            if (this.path[2] == "list-static") return this.getStaticPageList();
             if (this.path[2] == "get") return this.getPost();
             if (this.path[2] == "update") return this.updatePost();
         }
@@ -42,16 +45,19 @@ export class BlogController extends IController {
     }
 
     /**
-     * 記事の一覧を取得する
+     * 記事ページの一覧を取得する
      * @returns JsonResponse
      */
-    public async getList() {
+    public async getPostList() {
         if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
 
-        const res = await this.github.getList();
+        const res = await this.github.getPostList();
         const posts: any[] = await res.json();
 
         for (const post of posts) {
+            if (!post.name.endsWith(".md")) 
+                continue;
+
             post.name = post.name.replace(".md", "");
             post.meta = await this.getMetaCached(post.name, post);
         }
@@ -67,7 +73,35 @@ export class BlogController extends IController {
     }
 
     /**
-     * 記事のデータを取得する
+     * 固定ページの一覧を取得する
+     * @returns JsonResponse
+     */
+    public async getStaticPageList() {
+        if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
+
+        const res = await this.github.getStaticPageList();
+        const posts: any[] = await res.json();
+
+        for (const post of posts) {
+            if (!post.name.endsWith(".md"))
+                continue;
+            
+            post.name = post.name.replace(".md", "");
+            post.meta = await this.getMetaCached(post.name, post);
+        }
+
+        return createJsonResponse(
+            posts.map(post => ({
+                name: post.name,
+                sha: post.sha,
+                size: post.size,
+                meta: post.meta
+            }))
+        );
+    }
+
+    /**
+     * 記事ページを取得する
      * @returns JsonResponse
      */
     public async getPost() {
@@ -91,7 +125,7 @@ export class BlogController extends IController {
     }
 
     /**
-     * 記事を更新する
+     * 記事ページを更新する
      * @returns JsonResponse
      */
     public async updatePost() {
@@ -117,7 +151,7 @@ export class BlogController extends IController {
 
         const content = createFrontMatter(meta, _content as string);
 
-        const res = await this.github.updatePost(`${page}.md`, content, "Update post via Cloudflare Worker");
+        const res = await this.github.updatePost(`${page}`, content);
         const data2: any = await res.json();
 
         data2.success = true;
@@ -137,7 +171,7 @@ export class BlogController extends IController {
     }
 
     /**
-     * 記事のメタデータを取得する
+     * 記事ページのメタデータを取得する
      * @param slug ページ名
      * @param post 記事のデータ
      * @returns メタデータ
@@ -166,10 +200,10 @@ export class BlogController extends IController {
         return meta;
     }
 
-    public async getList_old() {
+    public async getListV1() {
         if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
 
-        const res = await this.github.getList();
+        const res = await this.github.getPostList();
         const data: any = await res?.json();
 
         const result = data.map((page: any) => ({
@@ -181,7 +215,7 @@ export class BlogController extends IController {
         return createJsonResponse(result);
     }
     
-    public async getPost_old() {
+    public async getPostV1() {
         if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
 
         let slug = this.url?.searchParams.get("page") || "";
@@ -205,7 +239,31 @@ export class BlogController extends IController {
         });
     }
     
-    public async updatePost_old() {
+    public async getStaticPageV1() {
+        if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
+
+        let slug = this.url?.searchParams.get("page") || "";
+        if (slug === "") throw HttpError.createBadRequest("Query parameter 'page' is required");
+        slug = `${slug}.md`;
+
+        const res = await this.github.getStaticPageRaw(slug);
+        const data: any = await res.json();
+
+        if (!data.content) throw new CustomHttpError(404, "NOT_FOUND", "Static page not found", data);
+
+        let content = data.content;
+        if (data.encoding && data.encoding === "base64")
+            content = base642txt(content);
+        
+        return createJsonResponse({
+            name: slug.replace(".md", ""),
+            sha: data.sha,
+            size: data.size,
+            content: content
+        });
+    }
+    
+    public async updatePostV1() {
         if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
@@ -218,12 +276,35 @@ export class BlogController extends IController {
         
         if (!page || !content) throw HttpError.createBadRequest("page and content headers are required");
 
-        const res = await this.github.updatePost(`${page}.md`, content, "Update post via Cloudflare Worker");
+        const res = await this.github.updatePost(`${page}`, content);
         const data2: any = await res.json();
 
         data2.success = true;
 
         await logInfo(this.request, this.env, "blog_update", `Update blog post "${page}" by ${data.localId}`);
+
+        return createJsonResponse(data2);
+    }
+    
+    public async updateStaticPageV1() {
+        if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
+        if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
+        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
+
+        const data: any = await this.firebase?.verifyIdToken(this.authorization);
+        await this.checkPermissionByEmail(data.email);
+
+        const page = this.request.headers.get("page");
+        const content = this.request.headers.get("content") || await this.request.text();
+        
+        if (!page || !content) throw HttpError.createBadRequest("page and content headers are required");
+
+        const res = await this.github.updateStaticPage(`${page}`, content);
+        const data2: any = await res.json();
+
+        data2.success = true;
+
+        await logInfo(this.request, this.env, "blog_update", `Update blog static page "${page}" by ${data.localId}`);
 
         return createJsonResponse(data2);
     }

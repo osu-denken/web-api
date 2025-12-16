@@ -26,12 +26,33 @@ export class GitHubService {
         });
     }
 
-    async getList() {
+    /**
+     * 記事ページの一覧
+     */
+    public async getPostList() {
         try {
             const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts`;
             const res = await this.request(url, "GET");
 
-            if (res.status === 404) throw new HttpError(404, "NOT_FOUND", "All posts not found");
+            if (res.status === 404)
+                throw new HttpError(404, "NOT_FOUND", "All posts not found");
+
+            return res;
+        } catch (e) {
+            return Promise.reject(e);
+        }
+    }
+
+    /**
+     * 固定ページの一覧
+     */
+    public async getStaticPageList() {
+        try {
+            const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents`;
+            const res = await this.request(url, "GET");
+
+            if (res.status === 404)
+                throw new HttpError(404, "NOT_FOUND", "All files not found");
 
             return res;
         } catch (e) {
@@ -43,7 +64,9 @@ export class GitHubService {
      * 
      * @param path  パス .mdを含む
      */
-    async getPostRaw(path: string) {
+    public async getPostRaw(path: string) {
+        GitHubService.checkSafePath(path);
+
         try {
             const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts/${path}`;
             const res = await this.request(url, "GET");
@@ -61,7 +84,7 @@ export class GitHubService {
      * @param slug ページ名
      * @returns 記事データ
      */
-    async getPost(slug: string) {
+    public async getPost(slug: string) {
         const filename = `${slug}.md`;
 
         const res = await this.getPostRaw(filename);
@@ -81,9 +104,103 @@ export class GitHubService {
         return post;
     }
 
-    async updatePost(path: string, content: string, message: string, sha?: string) {
+    /**
+     * ディレクトリトラバーサル対策
+     * @param path ページ名
+     * @param denySlash スラッシュ / を拒否するかどうか
+     */
+    private static async checkSafePath(path: string, denySlash: boolean = false) {
+        // 英数字ハイフンスラッシュのみを許可する
+        // if (!/^[a-zA-Z0-9\-\/]+$/.test(slug))
+        //     throw new HttpError(400, "INVALID_SLUG", "Invalid slug");
+
+        // / を拒否
+        if (denySlash && path.includes("/")) 
+            throw new HttpError(400, "INVALID_SLUG", "Using slash in slug is deny");
+        
+
+        // ../ を拒否
+        if (path.includes(".."))
+            throw new HttpError(400, "INVALID_SLUG", "Path traversal detected");
+    }
+
+
+    /**
+     * 固定ページの取得
+     * @param slug 固定ページ名
+     * @returns ソース
+     */
+    public async getStaticPageRaw(slug: string) {
+        GitHubService.checkSafePath(slug);
+
+        const filename = `${slug}.md`;
+
+        const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${filename}`;
+        const res = await this.request(url, "GET");
+
+        if (res.status === 404) throw new HttpError(404, "NOT_FOUND", "Post not found");
+
+        const post: any = await res.json();
+        
+        let source = post.content;
+        if (post.encoding && post.encoding === "base64")
+            source = base642txt(source);
+
+        return post;
+    }
+
+    /**
+     * 固定ページの更新
+     * @param slug ページ名
+     * @param content ソース
+     * @param message コミットメッセージ
+     * @param sha ハッシュ値
+     * @returns 
+     */
+    public async updateStaticPage(slug: string, content: string, message: string = "Update static page via Cloudflare Worker", sha?: string) {
+        GitHubService.checkSafePath(slug, true);
+
+        const filename = `${slug}.md`;
+
         try {
-            const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts/${path}`;
+            const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${filename}`;
+            const body: { message: string; content: string; branch: string; sha?: string } = {
+                message,
+                content: txt2base64(content),
+                branch: BRANCH
+            };
+            
+            if (sha) {
+                body.sha = sha;
+            } else {
+                const req = await this.request(url, "GET");
+                if (req.status === 200) {
+                    const data = await req.json() as { sha: string };
+                    body.sha = data.sha;
+                }
+            }
+
+            return this.request(url, "PUT", body);
+        } catch (e) {
+            return Promise.reject(e);
+        }
+    }
+
+    /**
+     * 記事ページの更新
+     * @param slug ページ名
+     * @param content ソース
+     * @param message コミットメッセージ
+     * @param sha ハッシュ値
+     * @returns 
+     */
+    public async updatePost(slug: string, content: string, message: string = "Update post via Cloudflare Worker", sha?: string) {
+        GitHubService.checkSafePath(slug);
+
+        const filename = `${slug}.md`;
+
+        try {
+            const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts/${filename}`;
             const body: { message: string; content: string; branch: string; sha?: string } = {
                 message,
                 content: txt2base64(content),
@@ -106,7 +223,7 @@ export class GitHubService {
         }
     }
     
-    async inviteOrganization(email: string) {
+    public async inviteOrganization(email: string) {
         const url = `https://api.github.com/orgs/${OWNER}/invitations`;
 
         const res = await fetch(url, {
