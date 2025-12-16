@@ -212,8 +212,7 @@ export class BlogController extends IController {
         const cached = cachedStr ? JSON.parse(cachedStr) : null;
 
         if (!page || (page && !page.content)) {
-            const res = await this.github!.getStaticPageRaw(`${slug}.md`);
-            page = await res.json();
+            const page: any = await this.github!.getStaticPageRaw(`${slug}.md`);
             if (!page.content) return {};
         }
         const sha = page.sha;
@@ -276,8 +275,7 @@ export class BlogController extends IController {
         if (slug === "") throw HttpError.createBadRequest("Query parameter 'page' is required");
         slug = `${slug}.md`;
 
-        const res = await this.github.getStaticPageRaw(slug);
-        const page: any = await res.json();
+        const page: any = await this.github.getStaticPageRaw(slug);
 
         if (!page.content) throw new CustomHttpError(404, "NOT_FOUND", "Static page not found", page);
 

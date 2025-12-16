@@ -113,12 +113,7 @@ export class GitHubService {
         if (res.status === 404) 
             throw new HttpError(404, "NOT_FOUND", "Static page not found");
 
-        let page: any;
-        try {
-            page = await res.json();
-        } catch(e) {
-            throw new CustomHttpError(500, "INTERNAL_SERVER_ERROR", "Internal server error", JSON.stringify(res, null, 2));
-        }
+        const page: any = await res.json();
         
         let source = page.content;
         if (page.encoding && page.encoding === "base64")
