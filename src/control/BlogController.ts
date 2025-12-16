@@ -27,18 +27,18 @@ export class BlogController extends IController {
 
     public route() {
         if (this.path[0] === "v1") {
-            if (this.path[2] == "list") return this.getListV1();
-            if (this.path[2] == "get") return this.getPostV1();
-            if (this.path[2] == "get-static") return this.getStaticPageV1();
-            if (this.path[2] == "update") return this.updatePostV1();
-            if (this.path[2] == "update-static") return this.updateStaticPageV1();
+            if (this.path[2] === "list") return this.getListV1();
+            if (this.path[2] === "get") return this.getPostV1();
+            if (this.path[2] === "get-static") return this.getStaticPageV1();
+            if (this.path[2] === "update") return this.updatePostV1();
+            if (this.path[2] === "update-static") return this.updateStaticPageV1();
         }
 
         if (this.path[0] === "v2") {
-            if (this.path[2] == "list") return this.getPostList();
-            if (this.path[2] == "list-static") return this.getStaticPageList();
-            if (this.path[2] == "get") return this.getPost();
-            if (this.path[2] == "update") return this.updatePost();
+            if (this.path[2] === "list") return this.getPostList();
+            if (this.path[2] === "list-static") return this.getStaticPageList();
+            if (this.path[2] === "get") return this.getPost();
+            if (this.path[2] === "update") return this.updatePost();
         }
 
         throw HttpError.createNotFound("Endpoint not found");
@@ -80,18 +80,18 @@ export class BlogController extends IController {
         if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
 
         const res = await this.github.getStaticPageList();
-        const posts: any[] = await res.json();
+        const pages: any[] = await res.json();
 
-        for (const post of posts) {
-            if (!post.name.endsWith(".md"))
+        for (const page of pages) {
+            if (!page.name.endsWith(".md"))
                 continue;
             
-            post.name = post.name.replace(".md", "");
-            post.meta = await this.getMetaCached(post.name, post);
+            page.name = page.name.replace(".md", "");
+            page.meta = await this.getMetaCached(page.name, page);
         }
 
         return createJsonResponse(
-            posts.map(post => ({
+            pages.map(post => ({
                 name: post.name,
                 sha: post.sha,
                 size: post.size,
@@ -223,18 +223,18 @@ export class BlogController extends IController {
         slug = `${slug}.md`;
 
         const res = await this.github.getPostRaw(slug);
-        const data: any = await res.json();
+        const post: any = await res.json();
 
-        if (!data.content) throw new CustomHttpError(404, "NOT_FOUND", "Post not found", data);
+        if (!post.content) throw new CustomHttpError(404, "NOT_FOUND", "Post not found", post);
 
-        let content = data.content;
-        if (data.encoding && data.encoding === "base64")
+        let content = post.content;
+        if (post.encoding && post.encoding === "base64")
             content = base642txt(content);
         
         return createJsonResponse({
             name: slug.replace(".md", ""),
-            sha: data.sha,
-            size: data.size,
+            sha: post.sha,
+            size: post.size,
             content: content
         });
     }
@@ -247,18 +247,18 @@ export class BlogController extends IController {
         slug = `${slug}.md`;
 
         const res = await this.github.getStaticPageRaw(slug);
-        const data: any = await res.json();
+        const page: any = await res.json();
 
-        if (!data.content) throw new CustomHttpError(404, "NOT_FOUND", "Static page not found", data);
+        if (!page.content) throw new CustomHttpError(404, "NOT_FOUND", "Static page not found", page);
 
-        let content = data.content;
-        if (data.encoding && data.encoding === "base64")
+        let content = page.content;
+        if (page.encoding && page.encoding === "base64")
             content = base642txt(content);
         
         return createJsonResponse({
             name: slug.replace(".md", ""),
-            sha: data.sha,
-            size: data.size,
+            sha: page.sha,
+            size: page.size,
             content: content
         });
     }
