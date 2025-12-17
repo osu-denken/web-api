@@ -21,6 +21,7 @@ export class ImageController extends IController {
 
     public route() {
         if (this.path[2] === "upload") return this.upload();
+        if (this.path[2] === "delete") return this.delete();
         throw HttpError.createNotFound("Endpoint not found");
     }
 
