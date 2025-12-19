@@ -209,6 +209,9 @@ Firebase Authentication を利用したユーザー管理 API である。ユー
 - **`FIREBASE_API_KEY`**: Firebase プロジェクトの Web API キー。
 - **`REGISTER_PASSPHRASE`**: 新規ユーザー登録時に使用する共通の合言葉。(招待コードを基本的に使うため、あまり使わない)
 - **`DISCORD_INVITE`**: Discord サーバーの招待コード。
+- **`GOOGLE_SA_KEY`**: Google Spreadsheet用のキー
+- **`MEMBERS_SPREADSHEET_ID`**: 名簿のシートID
+- **`SECRET_KEY`**: 暗号化用などのシークレットキー
 
 ### KV Namespace Bindings
 
@@ -217,3 +220,5 @@ Wrangler の設定 (`wrangler.jsonc`) で、以下の KV Namespace がバイン�
 - **`BLOG_META`**: ブログ記事のメタデータのキャッシュ用。
 - **`INVITE_CODE`**: ユーザー登録の招待コード保存用。
 - **`LOGS`**: API の操作ログ記録用。
+- **`MEMBERS`**: 名簿のキャッシュ用
+- **`CACHE`** 汎用キャッシュ用
