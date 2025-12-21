@@ -135,6 +135,8 @@ export class BlogController extends IController {
 
         const data: any = await this.firebase?.verifyIdToken(this.authorization);
         await this.checkPermissionByEmail(data.email);
+        
+        await this.github.useUserGitHubToken(this.env, data.localId);
 
         const page = this.request.headers.get("page");
         const _meta = this.request.headers.get("meta");
@@ -298,6 +300,8 @@ export class BlogController extends IController {
 
         const data: any = await this.firebase?.verifyIdToken(this.authorization);
         await this.checkPermissionByEmail(data.email);
+        
+        await this.github.useUserGitHubToken(this.env, data.localId);
 
         const page = this.request.headers.get("page");
         const content = this.request.headers.get("content") || await this.request.text();
@@ -321,6 +325,8 @@ export class BlogController extends IController {
 
         const data: any = await this.firebase?.verifyIdToken(this.authorization);
         await this.checkPermissionByEmail(data.email);
+        
+        await this.github.useUserGitHubToken(this.env, data.localId);
 
         const page = this.request.headers.get("page");
         const content = this.request.headers.get("content") || await this.request.text();

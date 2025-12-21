@@ -1,5 +1,5 @@
 import { HttpError } from "../util/HttpError";
-import { createJsonResponse, generateInviteCode, logInfo } from "../util/utils";
+import { createJsonResponse, decrypt, encrypt, generateInviteCode, logInfo } from "../util/utils";
 import { IController } from "./IController";
 
 export class PortalController extends IController {    
@@ -12,12 +12,21 @@ export class PortalController extends IController {
     }
 
     public route() {
-        if (this.path[0] === "portal" && this.path.length === 1) return this.portal();
-        if (this.path[0] === "portal" && this.path[1] === "members") return this.members();
-        if (this.path[0] === "portal" && this.path[1] === "memberCount") return this.memberCount();
-        if (this.path[0] === "portal" && this.path[1] === "member" && this.path[2] === "me") return this.memberMe();
-        if (this.path[0] === "github" && this.path[1] === "invite") return this.githubInvite();
+        if (this.path[0] === "github") {
+            if (this.path[1] === "invite") return this.githubInvite();
+            if (this.path[1] === "token") return this.githubToken();
+        }
+
+
         if (this.path[0] === "discord" && this.path[1] === "invite") return this.discordInvite();
+    
+        if (this.path[0] !== "portal") 
+            throw HttpError.createNotFound("Endpoint not found");
+
+        if (this.path.length === 1) return this.portal();
+        if (this.path[1] === "members") return this.members();
+        if (this.path[1] === "memberCount") return this.memberCount();
+        if (this.path[1] === "member" && this.path[2] === "me") return this.memberMe();
 
         throw HttpError.createNotFound("Endpoint not found");
     }
@@ -114,8 +123,6 @@ export class PortalController extends IController {
         const data: any = await this.firebase?.verifyIdToken(this.authorization);
         await this.checkPermissionByEmail(data.email);
 
-        if (!data) throw new HttpError(401, "UNAUTHORIZED", "Invalid idToken");
-
         const { email } = await this.request.json() as { email: string };
         if (!email) throw new HttpError(400, "BAD_REQUEST", "email is required");
 
@@ -144,14 +151,57 @@ export class PortalController extends IController {
         const data: any = await this.firebase?.verifyIdToken(this.authorization);
         await this.checkPermissionByEmail(data.email);
 
-        if (data.disabled) {
-            throw new HttpError(403, "FORBIDDEN", "User account is disabled");
-        }
-
-        if ((data.error || !data.localId)) {
-            throw new HttpError(401, "UNAUTHORIZED", "Invalid idToken");
-        }
-
         return createJsonResponse({ code: this.env.DISCORD_INVITE, success: true });
+    }
+
+    /**
+     * GitHub Token の設定
+     */
+    public async githubToken() {
+        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
+
+        const data: any = await this.firebase?.verifyIdToken(this.authorization);
+        await this.checkPermissionByEmail(data.email);
+
+        // GET (check exist)
+        if (this.request?.method === "GET") {
+            const raw = await this.env.USER_CUSTOM.get(data.localId);
+            const customData = JSON.parse((raw ?? `{}`));
+
+            if (customData.githubTokenEncoded)
+                createJsonResponse({ success: true, isExist: true });
+
+            createJsonResponse({ success: true, isExist: false });
+        }
+
+        // POST
+        if (this.request?.method === "POST" || this.request?.method === "PUT") {
+            const raw = await this.env.USER_CUSTOM.get(data.localId);
+            const customData = JSON.parse((raw ?? `{}`));
+
+            const { githubToken } = await this.request.json() as { githubToken: string };
+            customData.githubTokenEncoded = await encrypt(githubToken, this.env.SECRET_KEY);
+
+            await this.env.USER_CUSTOM.put(data.localId, JSON.stringify(customData, null, 2));
+            await logInfo(this.request, this.env, "portal", `set github token to ${data.localId}`);
+
+            return createJsonResponse({ success: true });
+        }
+
+        // DELETE
+        if (this.request?.method === "DELETE") {
+            const raw = await this.env.USER_CUSTOM.get(data.localId);
+            const customData = JSON.parse((raw ?? `{}`));
+
+            delete customData.githubTokenEncoded;
+
+            await this.env.USER_CUSTOM.put(data.localId, JSON.stringify(customData, null, 2));
+
+            await logInfo(this.request, this.env, "portal", `delete github token from ${data.localId}`);
+
+            return createJsonResponse({ success: true });
+        }
+
+        return createJsonResponse({ success: false });
     }
 }

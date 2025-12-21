@@ -7,8 +7,10 @@ export interface Env {
 	REGISTER_PASSPHRASE: string;
 	GOOGLE_DRIVE_TOKEN: string;
 	GOOGLE_SA_KEY: string;
+	SECRET_KEY: string;
 
 	MEMBERS_SPREADSHEET_ID: string;
+	
 
 	// Key-Value
     BLOG_META: KVNamespace;
@@ -16,4 +18,5 @@ export interface Env {
 	LOGS: KVNamespace;
 	MEMBERS: KVNamespace;
 	CACHE: KVNamespace;
+	USER_CUSTOM: KVNamespace;
 }

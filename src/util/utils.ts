@@ -1,5 +1,8 @@
 import { Env } from "./types";
 
+const encoder = new TextEncoder();
+const decoder = new TextDecoder();
+
 export interface FMObj {
   meta: Record<string, any>;
   content: string;
@@ -78,7 +81,7 @@ export function base642txt(base64: string) {
     for (let i = 0; i < decodedContent.length; i++) {
         bytes[i] = decodedContent.charCodeAt(i);
     }
-    return new TextDecoder().decode(bytes);
+    return decoder.decode(bytes);
 }
 
 export function arrayBuffer2base64(buffer: ArrayBuffer) {
@@ -91,6 +94,24 @@ export function arrayBuffer2base64(buffer: ArrayBuffer) {
     }
 
     return btoa(bin);
+}
+
+export function u82Base64(u8: Uint8Array): string {
+  let bin = "";
+  const chunkSize = 0x8000;
+  for (let i = 0; i < u8.length; i += chunkSize) {
+    bin += String.fromCharCode(...u8.subarray(i, i + chunkSize));
+  }
+  return btoa(bin);
+}
+
+export function base642U8(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const u8 = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) {
+    u8[i] = bin.charCodeAt(i);
+  }
+  return u8;
 }
 
 
@@ -152,7 +173,7 @@ export function createJsonResponse(data: any) {
 }
 
 export function sha256(data: string): Promise<string> {
-    const buf = new TextEncoder().encode(data);
+    const buf = encoder.encode(data);
     return crypto.subtle.digest("SHA-256", buf).then((hashBuf) => {
         const hashArray = Array.from(new Uint8Array(hashBuf));
         const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
@@ -171,4 +192,51 @@ export function generateInviteCode(length = 8): string {
         code += chars[Math.floor(Math.random() * chars.length)];
     }
     return code;
+}
+
+/**
+ * パスワードとソルトからAES-GCMの鍵とIVを生成
+ * @param pass 暗号化/復号化用のパスワード
+ * @param salt ソルトのUnit8Array
+ * @param type encrypt or decrypt
+ * @returns { key: CryptoKEy, iv: Uint8Array } 暗号化鍵とIV(初期ベクトル)
+ */
+async function deriveKeyAndIv(pass: string, salt: Uint8Array, type: ("encrypt" | "decrypt")[]) {
+  const km = await crypto.subtle.importKey("raw", encoder.encode(pass), "PBKDF2", false, ["deriveBits"]);
+
+  const bits = new Uint8Array(await crypto.subtle.deriveBits({name: "PBKDF2", salt, 
+    iterations: 100_000, hash: "SHA-256"}, km, 512));
+
+  return {key: await crypto.subtle.importKey("raw", bits.slice(0, 32), "AES-GCM", false, type),
+    iv: bits.slice(32, 44)};
+}
+
+/**
+ * 暗号化 (ソルト自動生成)
+ * @param plain 平文
+ * @param pass 暗号化パスワード
+ * @returns <base64のsalt>.<base64の暗号文>
+ */
+export async function encrypt(plain: string, pass: string): Promise<string> {
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const { key, iv } = await deriveKeyAndIv(pass, salt, ["encrypt"]);
+  const encrypted = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, encoder.encode(plain));
+
+  return `${u82Base64(salt)}.${arrayBuffer2base64(encrypted)}`;
+}
+
+/**
+ * 復号化
+ * @param encoded <base64のsalt>.<base64の暗号文>
+ * @param pass 暗号化パスワード
+ * @returns 平文
+ */
+export async function decrypt(encoded: string, pass: string): Promise<string> {
+  const [encodedSalt, encodedEncrypted] = encoded.split(".");
+  if (!encodedSalt || !encodedEncrypted) throw new Error("invalid format");
+
+  const { key, iv } = await deriveKeyAndIv(pass, base642U8(encodedSalt), ["decrypt"]);
+  const decrypted = await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, base642U8(encodedEncrypted));
+
+  return decoder.decode(decrypted);
 }

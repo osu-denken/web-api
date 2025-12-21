@@ -1,6 +1,7 @@
 import { CustomHttpError } from "../CustomHttpError";
 import { HttpError } from "../HttpError";
-import { base642txt, parseFrontMatter, txt2base64 } from "../utils";
+import { Env } from "../types";
+import { base642txt, decrypt, parseFrontMatter, txt2base64 } from "../utils";
 
 const OWNER = "osu-denken";
 const REPO = "blog";
@@ -19,6 +20,7 @@ export class GitHubService {
             "Content-Type": "application/json",
             "User-Agent": "osu-denken-admin-cloudflare-worker"
         };
+
         return fetch(url, {
             method,
             headers,
@@ -316,5 +318,36 @@ export class GitHubService {
     public async deleteImage(filename: string, sha?: string, message: string = "Delete image via Cloudflare Worker") {
         await GitHubService.checkSafePath(filename, true);
         return this.deleteFile(`images/${filename}`, sha, message);
+    }
+
+    /**
+     * GitHub Token の取得 (機密情報であるため、扱いには気を付けるやうに)
+     * @param env 環境変数群
+     * @param localId Firebase Local ID
+     * @returns github token or null
+     */
+    private async getGitHubToken(env: Env, localId: string): Promise<string | null> {
+        const raw = await env.USER_CUSTOM.get(localId);
+        if (!raw) return null;
+
+        const customData = JSON.parse(raw);
+        if (!customData.githubTokenEncoded) return null;
+
+        try {
+            return await decrypt(customData.githubTokenEncoded, env.SECRET_KEY);
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * ユーザーが設定しているGitHub Tokenを利用する
+     * @param env 環境変数群
+     * @param localId Firebase Local ID
+     */
+    public async useUserGitHubToken(env: Env, localId: string) {
+        const token = await this.getGitHubToken(env, localId);
+        if (token) 
+            this.token = token;
     }
 }

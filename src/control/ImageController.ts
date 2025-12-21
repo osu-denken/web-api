@@ -21,6 +21,7 @@ export class ImageController extends IController {
 
     public route() {
         if (this.path[2] === "upload") return this.upload();
+        if (this.path[2] === "delete") return this.delete();
         throw HttpError.createNotFound("Endpoint not found");
     }
 
@@ -31,6 +32,8 @@ export class ImageController extends IController {
 
         const data: any = await this.firebase?.verifyIdToken(this.authorization);
         await this.checkPermissionByEmail(data.email);
+        
+        await this.github.useUserGitHubToken(this.env, data.localId);
 
         const contentType = this.request.headers.get("content-type") || "";
         if (!contentType.includes("multipart/form-data")) throw HttpError.createBadRequest("multipart/form-data required");
@@ -57,7 +60,7 @@ export class ImageController extends IController {
 
         const result: any = await res.json();
 
-        await logInfo(this.request, this.env, "image_upload", `Upload image "${filename}" by ${data.localId}`);
+        await logInfo(this.request, this.env, "image", `Upload image "${filename}" by ${data.localId}`);
 
         return createJsonResponse({
             success: true,
@@ -74,7 +77,8 @@ export class ImageController extends IController {
 
         const data: any = await this.firebase?.verifyIdToken(this.authorization);
         await this.checkPermissionByEmail(data.email);
-
+        
+        await this.github.useUserGitHubToken(this.env, data.localId);
 
         const body: any = await this.request.json();
         const filename = body?.filename as string;
@@ -83,7 +87,7 @@ export class ImageController extends IController {
         if (!filename) throw HttpError.createBadRequest("filename is required");
         await this.github.deleteImage(filename, sha);
 
-        await logInfo(this.request, this.env, "image_delete", `Deleted image "${filename}" by ${data.localId}`);
+        await logInfo(this.request, this.env, "image", `Deleted image "${filename}" by ${data.localId}`);
 
         return createJsonResponse({ success: true, filename });
     }

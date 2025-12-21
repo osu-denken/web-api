@@ -55,7 +55,7 @@ export default {
 		let authorization = request.headers.get("Authorization") ?? null;
 
 		try {
-			if (!env.GITHUB_TOKEN) throw new HttpError(500, "INTERNAL_SERVER_ERROR", "GITHUB_TOKEN is not set");
+			// if (!env.GITHUB_TOKEN) throw new HttpError(500, "INTERNAL_SERVER_ERROR", "GITHUB_TOKEN is not set");
 			if (!env.FIREBASE_API_KEY) throw new HttpError(500, "INTERNAL_SERVER_ERROR", "FIREBASE_API_KEY is not set");
 			if (!env.MEMBERS_SPREADSHEET_ID) throw new HttpError(500, "INTERNAL_SERVER_ERROR", "MEMBERS_SPREADSHEET_ID is not set");
 
