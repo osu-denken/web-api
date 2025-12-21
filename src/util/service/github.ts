@@ -34,10 +34,6 @@ export class GitHubService {
      * @param denySlash スラッシュ / を拒否するかどうか
      */
     private static async checkSafePath(path: string, denySlash: boolean = false) {
-        // 英数字ハイフンスラッシュのみを許可する
-        // if (!/^[a-zA-Z0-9\-\/]+$/.test(slug))
-        //     throw new HttpError(400, "INVALID_SLUG", "Invalid slug");
-
         // / を拒否
         if (denySlash && path.includes("/")) 
             throw new HttpError(400, "INVALID_SLUG", "Using slash in slug is deny");
@@ -98,7 +94,7 @@ export class GitHubService {
     public async getFileContent(path: string) {
         try {
             return this.request(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`, "GET");
-        } catch {
+        } catch (e) {
             return new CustomHttpError(500, "INTERNAL_SERVER_ERROR", "GitHub get file failed", e)
         }
     }
@@ -108,7 +104,7 @@ export class GitHubService {
      * @param path ファイルパス
      */
     private async getSha(path: string): Promise<string> {
-        const res = await getFileContent(path);
+        const res: any = await this.getFileContent(path);
         if (!res.ok)
             throw new CustomHttpError(res.status, "NOT_FOUND", "File not found", await res.text());
         
@@ -120,7 +116,7 @@ export class GitHubService {
      * 記事ページの一覧
      */
     public async getPostList() {
-        const res = await getFileContent("_posts");
+        const res = await this.getFileContent("_posts");
 
         if (res.status === 404)
             throw new HttpError(404, "NOT_FOUND", "All posts not found");
@@ -132,7 +128,7 @@ export class GitHubService {
      * 固定ページの一覧
      */
     public async getStaticPageList() {
-        const res = await getFileContent("");
+        const res = await this.getFileContent("");
 
         if (res.status === 404)
             throw new HttpError(404, "NOT_FOUND", "All files not found");
@@ -147,7 +143,7 @@ export class GitHubService {
     public async getPostRaw(path: string) {
         await GitHubService.checkSafePath(path);
 
-        const res = await getFileContent(`_posts/${path}`);
+        const res = await this.getFileContent(`_posts/${path}`);
 
         if (res.status === 404) throw new HttpError(404, "NOT_FOUND", "Post not found");
         return res;
@@ -161,7 +157,7 @@ export class GitHubService {
     public async getStaticPageRaw(path: string) {
         await GitHubService.checkSafePath(path);
 
-        const res = await getFileContent(`${path}`);
+        const res: any = await this.getFileContent(`${path}`);
 
         if (res.status === 404) 
             throw new HttpError(404, "NOT_FOUND", "Static page not found");
@@ -183,7 +179,7 @@ export class GitHubService {
     public async getPost(slug: string) {
         const filename = `${slug}.md`;
 
-        const res = await this.getPostRaw(filename);
+        const res: any = await this.getPostRaw(filename);
         const post: any = await res.json();
 
         if (!post.content) throw new CustomHttpError(404, "NOT_FOUND", "Post not found", post);
