@@ -52,7 +52,6 @@ export abstract class IController {
     }
 
     public setAuthorization(authorization: string | null) {
-        
         this.authorization = authorization;
         if (this.authorization == null) return;
  
@@ -89,9 +88,34 @@ export abstract class IController {
     public async checkPermissionByEmail(email?: string) {
         if (!email) throw HttpError.createUnauthorized("Email is required for permission check");
         if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
-        if (!email.endsWith("@ge.osaka-sandai.ac.jp")) throw HttpError.createBadRequest("Email must be from ge.osaka-sandai.ac.jp domain");
+        if (!email.endsWith(this.env.ALLOWED_EMAIL_DOMAIN)) throw HttpError.createBadRequest(`Email must be from ${this.env.ALLOWED_EMAIL_DOMAIN} domain`);
 
         const hasPermission: boolean = await this.members_googlesheets.hasPermissionByEmail(email);
         if (!hasPermission) throw HttpError.createForbidden("You are not have permissions");
+    }
+    
+    /**
+     * 認証と権限をチェックする
+     * @returns 認証データ
+     */
+    protected async checkAuthAndPermission() {
+        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
+
+        const data: any = await this.firebase?.verifyIdToken(this.authorization);
+        await this.checkPermissionByEmail(data.email);
+
+        return data;
+    }
+
+    /**
+     * 認証チェックをする
+     * @returns 認証データ
+     */
+    protected async checkAuth() {
+        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
+
+        const data: any = await this.firebase?.verifyIdToken(this.authorization);
+
+        return data;
     }
 }

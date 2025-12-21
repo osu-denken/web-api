@@ -20,8 +20,12 @@ const routes: Record<string, ControllerFactory> = {
   "invite": (path) => new InviteController(path),
   "image": (path) => new ImageController(path),
   "portal": (path) => new PortalController(path),
-  "discord": (path) => new PortalController(path),
-  "github": (path) => new PortalController(path),
+  "v1/ping" : (path) => new PingController(path),
+  "v1/user": (path) => new UserController(path),
+  "v1/blog": (path) => new BlogController(path),
+  "v1/invite": (path) => new InviteController(path),
+  "v1/image": (path) => new ImageController(path),
+  "v1/portal": (path) => new PortalController(path),
 };
 
 export default {
@@ -41,10 +45,9 @@ export default {
 
 		let controller: IController | null = null;
 
-		// v1 / v2がある場合
 		let base = path[0];
-		if (base === "v1" || base === "v2" && path.length >= 2) {
-			base = path[1];
+		if (path[0] === "v1" || path[0] === "v2") { // v1 / v2がある場合
+			base = `${path[0]}/${path[1]}`;
 		}
 
 		const factory = routes[base];

@@ -1,7 +1,7 @@
 import { CustomHttpError } from "../CustomHttpError";
 import { HttpError } from "../HttpError";
 import { Env } from "../types";
-import { base642txt, decrypt, parseFrontMatter, txt2base64 } from "../utils";
+import { b64ToStr, decrypt, toBase64, parseFrontMatter } from "../utils";
 
 const OWNER = "osu-denken";
 const REPO = "blog";
@@ -119,7 +119,7 @@ export class GitHubService {
         
         let source = page.content;
         if (page.encoding && page.encoding === "base64")
-            source = base642txt(source);
+            source = b64ToStr(source);
 
         return page;
     }
@@ -139,7 +139,7 @@ export class GitHubService {
         
         let source = post.content;
         if (post.encoding && post.encoding === "base64")
-            source = base642txt(source);
+            source = b64ToStr(source);
 
         const parsed = parseFrontMatter(source);
 
@@ -166,7 +166,7 @@ export class GitHubService {
             const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${filename}`;
             const body: { message: string; content: string; branch: string; sha?: string } = {
                 message,
-                content: txt2base64(content),
+                content: toBase64(content),
                 branch: BRANCH
             };
             
@@ -203,7 +203,7 @@ export class GitHubService {
             const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts/${filename}`;
             const body: { message: string; content: string; branch: string; sha?: string } = {
                 message: message,
-                content: txt2base64(content),
+                content: toBase64(content),
                 branch: BRANCH
             };
             

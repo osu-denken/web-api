@@ -36,10 +36,8 @@ export class InviteController extends IController {
 
     public async create() {
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
-
-        const data: any = await this.firebase?.verifyIdToken(this.authorization);
-        await this.checkPermissionByEmail(data.email);
+        
+        const data = await this.checkAuthAndPermission();
         
         const code = generateInviteCode(12);
 
@@ -52,10 +50,8 @@ export class InviteController extends IController {
 
     public async delete() {
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
-
-        const data: any = await this.firebase?.verifyIdToken(this.authorization);
-        await this.checkPermissionByEmail(data.email);
+        
+        const data = await this.checkAuthAndPermission();
         
         const { code } = await this.request.json() as { code: string };
 

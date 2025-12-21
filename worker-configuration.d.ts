@@ -6,6 +6,7 @@ declare namespace Cloudflare {
 		mainModule: typeof import("./src/index");
 	}
 	interface Env {
+		ALLOWED_EMAIL_DOMAIN: string;
 	}
 }
 interface Env extends Cloudflare.Env {}

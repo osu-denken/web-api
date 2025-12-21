@@ -36,10 +36,8 @@ export class PortalController extends IController {
      */
     public async portal() {
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
-
-        const data: any = await this.firebase?.verifyIdToken(this.authorization);
-        await this.checkPermissionByEmail(data.email);
+        
+        const data = await this.checkAuthAndPermission();
 
         return createJsonResponse({
             success: true,
@@ -56,10 +54,8 @@ export class PortalController extends IController {
      */
     public async members() {
         if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
-        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
-
-        const data: any = await this.firebase?.verifyIdToken(this.authorization);
-        await this.checkPermissionByEmail(data.email);
+        
+        await this.checkAuthAndPermission();
 
         const members = await this.members_googlesheets.getMembersWithCache();
         const response = createJsonResponse(members);
@@ -84,19 +80,10 @@ export class PortalController extends IController {
      */
     public async memberMe() {
         if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
-        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
-
-        const data: any = await this.firebase?.verifyIdToken(this.authorization);
-        // await this.checkPermissionByEmail(data.email);
+        
+        const data = await this.checkAuth();
 
         let studentId = data.email.split("@")[0];
-        // if (studentId.startsWith("s"))
-            // studentId = studentId.slice(1);
-
-        // studentId = studentId.toUpperCase();
-
-        // const row = await this.members_googlesheets.findRowByHeader("main", "A1:K100", "num", studentId);
-        // if (!row) throw HttpError.createNotFound(`Member ${studentId} not found`);
         const member: any = await this.members_googlesheets.getMemberWithCache(studentId);
 
         return createJsonResponse(member);
@@ -118,10 +105,8 @@ export class PortalController extends IController {
      */
     public async githubInvite() {
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
-
-        const data: any = await this.firebase?.verifyIdToken(this.authorization);
-        await this.checkPermissionByEmail(data.email);
+        
+        await this.checkAuthAndPermission();
 
         const { email } = await this.request.json() as { email: string };
         if (!email) throw new HttpError(400, "BAD_REQUEST", "email is required");
@@ -146,10 +131,8 @@ export class PortalController extends IController {
      */
     public async discordInvite() {
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
-        const data: any = await this.firebase?.verifyIdToken(this.authorization);
-        await this.checkPermissionByEmail(data.email);
+        await this.checkAuthAndPermission();
 
         return createJsonResponse({ code: this.env.DISCORD_INVITE, success: true });
     }
@@ -158,10 +141,7 @@ export class PortalController extends IController {
      * GitHub Token の設定
      */
     public async githubToken() {
-        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
-
-        const data: any = await this.firebase?.verifyIdToken(this.authorization);
-        await this.checkPermissionByEmail(data.email);
+        const data = await this.checkAuthAndPermission();
 
         // GET (check exist)
         if (this.request?.method === "GET") {
@@ -169,9 +149,9 @@ export class PortalController extends IController {
             const customData = JSON.parse((raw ?? `{}`));
 
             if (customData.githubTokenEncoded)
-                createJsonResponse({ success: true, isExist: true });
+                return createJsonResponse({ success: true, isExist: true });
 
-            createJsonResponse({ success: true, isExist: false });
+            return createJsonResponse({ success: true, isExist: false });
         }
 
         // POST

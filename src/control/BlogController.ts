@@ -1,6 +1,6 @@
 import { CustomHttpError } from "../util/CustomHttpError";
 import { HttpError } from "../util/HttpError";
-import { base642txt, createFrontMatter, createJsonResponse, logInfo, parseFrontMatter } from "../util/utils";
+import { b64ToStr, createFrontMatter, createJsonResponse, logInfo, parseFrontMatter } from "../util/utils";
 import { IController } from "./IController";
 
 export class BlogController extends IController {    
@@ -131,10 +131,8 @@ export class BlogController extends IController {
     public async updatePost() {
         if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
-        const data: any = await this.firebase?.verifyIdToken(this.authorization);
-        await this.checkPermissionByEmail(data.email);
+        const data = await this.checkAuthAndPermission();
         
         await this.github.useUserGitHubToken(this.env, data.localId);
 
@@ -193,7 +191,7 @@ export class BlogController extends IController {
 
         let content = post.content;
         if (post.encoding === "base64") 
-            content = base642txt(content);
+            content = b64ToStr(content);
 
         if (!content) throw new CustomHttpError(404, "NOT_FOUND", "Post content not found", post);
         const meta = parseFrontMatter(content).meta || {};
@@ -222,7 +220,7 @@ export class BlogController extends IController {
 
         let content = page.content;
         if (page.encoding === "base64") 
-            content = base642txt(content);
+            content = b64ToStr(content);
 
         if (!content) throw new CustomHttpError(404, "NOT_FOUND", "Page content not found", page);
         const meta = parseFrontMatter(content).meta || {};
@@ -260,7 +258,7 @@ export class BlogController extends IController {
 
         let content = post.content;
         if (post.encoding && post.encoding === "base64")
-            content = base642txt(content);
+            content = b64ToStr(content);
         
         return createJsonResponse({
             name: slug.replace(".md", ""),
@@ -283,7 +281,7 @@ export class BlogController extends IController {
 
         let content = page.content;
         if (page.encoding && page.encoding === "base64")
-            content = base642txt(content);
+            content = b64ToStr(content);
         
         return createJsonResponse({
             name: slug.replace(".md", ""),
@@ -296,10 +294,8 @@ export class BlogController extends IController {
     public async updatePostV1() {
         if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
-
-        const data: any = await this.firebase?.verifyIdToken(this.authorization);
-        await this.checkPermissionByEmail(data.email);
+        
+        const data = await this.checkAuthAndPermission();
         
         await this.github.useUserGitHubToken(this.env, data.localId);
 
@@ -321,10 +317,8 @@ export class BlogController extends IController {
     public async updateStaticPageV1() {
         if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
-
-        const data: any = await this.firebase?.verifyIdToken(this.authorization);
-        await this.checkPermissionByEmail(data.email);
+        
+        const data = await this.checkAuthAndPermission();
         
         await this.github.useUserGitHubToken(this.env, data.localId);
 

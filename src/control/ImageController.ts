@@ -1,6 +1,6 @@
 import { CustomHttpError } from "../util/CustomHttpError";
 import { HttpError } from "../util/HttpError";
-import { arrayBuffer2base64, createJsonResponse, logInfo } from "../util/utils";
+import { toBase64, createJsonResponse, logInfo } from "../util/utils";
 import { IController } from "./IController";
 
 export class ImageController extends IController {
@@ -28,10 +28,8 @@ export class ImageController extends IController {
     public async upload() {
         if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
-        const data: any = await this.firebase?.verifyIdToken(this.authorization);
-        await this.checkPermissionByEmail(data.email);
+        const data = await this.checkAuthAndPermission();
         
         await this.github.useUserGitHubToken(this.env, data.localId);
 
@@ -49,11 +47,9 @@ export class ImageController extends IController {
         name = name ? name.replace(/[^a-zA-Z0-9_-]/g, "") : null;
 
         const ext = this.getExt(file.type);
-        const filename = name
-            ? `${name}.${ext}`
-            : `${crypto.randomUUID()}.${ext}`;
+        const filename = name ? `${name}.${ext}` : `${crypto.randomUUID()}.${ext}`;
 
-        const base64 = arrayBuffer2base64(await file.arrayBuffer());
+        const base64 = toBase64(await file.arrayBuffer());
         const res = await this.github.uploadImage(filename, base64, `Upload image ${filename} via Cloudflare Worker`);
 
         if (!res.ok) throw new CustomHttpError(500, "INTERNAL_SERVER_ERROR", "GitHub upload failed", await res.text());
@@ -73,10 +69,8 @@ export class ImageController extends IController {
     public async delete() {
         if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
-
-        const data: any = await this.firebase?.verifyIdToken(this.authorization);
-        await this.checkPermissionByEmail(data.email);
+        
+        const data = await this.checkAuthAndPermission();
         
         await this.github.useUserGitHubToken(this.env, data.localId);
 
@@ -98,11 +92,16 @@ export class ImageController extends IController {
 
     private getExt(type: string) {
         switch (type) {
-            case "image/jpeg": return "jpg";
-            case "image/png": return "png";
-            case "image/webp": return "webp";
-            case "image/gif": return "gif";
-            default: return "bin";
+            case "image/jpeg": 
+                return "jpg";
+            case "image/png":
+                return "png";
+            case "image/webp":
+                return "webp";
+            case "image/gif":
+                return "gif";
+            default: 
+                return "bin";
         }
     }
 }
