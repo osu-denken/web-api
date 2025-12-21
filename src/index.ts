@@ -26,6 +26,7 @@ const routes: Record<string, ControllerFactory> = {
   "v1/invite": (path) => new InviteController(path),
   "v1/image": (path) => new ImageController(path),
   "v1/portal": (path) => new PortalController(path),
+  "v2/blog": (path) => new BlogController(path),
 };
 
 export default {
