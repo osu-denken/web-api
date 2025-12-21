@@ -4,18 +4,18 @@ Cloudflare Workers上で稼働しています。
 
 ## 機能
 
-- **Blog API**: GitHub リポジトリ内の Markdown ファイルをブログ記事として管理 (取得、一覧、更新) 
-- **User API**: Firebase Authentication と連携したユーザー認証・管理機能 (大産大のドメインを持つメールアドレスのみ登録可能)
-- **Invite API**: 新規ユーザー登録のための招待コード発行・管理機能
+- **Blog API**: GitHubリポジトリ内の Markdownファイルをブログ記事として管理 (取得、一覧、更新) 
+- **Image API**: ブログ記事の画像のアップロードや削除など
+- **User API**: Firebase Authenticationを用いたユーザー認証、管理 (大産大のドメインを持つメールアドレスのみ登録可能)
+- **Invite API**: 新規ユーザー登録のための招待コード作成、管理
 - **Portal API**: 部員向けポータルサイト用の情報集約、および外部サービス (GitHub, Discord) への招待機能
 
 ## セットアップ
 
 ### 前提
-
 - [Node.js](https://nodejs.org/) (v20 以降)
 - [pnpm](https://pnpm.io/ja/)
-- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/) (Cloudflare アカウントでのログインが必要)
+- [Wrangler CLI](https://developers.cloudflare.com/workers/wrangler/install-and-update/) (Cloudflareアカウントでのログインが必要)
 
 ### インストール
 
