@@ -42,44 +42,102 @@ export class GitHubService {
         if (denySlash && path.includes("/")) 
             throw new HttpError(400, "INVALID_SLUG", "Using slash in slug is deny");
         
-
         // ../ を拒否
         if (path.includes(".."))
             throw new HttpError(400, "INVALID_SLUG", "Path traversal detected");
     }
 
     /**
+     * ファイルをアップロードする
+     * @param path パス
+     * @param contentBase64 base64エンコードしたデータ
+     * @param message コミットメッセージ
+     * @param sha ハッシュ値
+     * @returns 
+     */
+    public async uploadFile(path: string, contentBase64: string, message: string = "Upload file via Cloudflare Worker", sha?: string) {
+        const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`
+        const body: { message: string; content: string; branch: string; sha?: string } = {
+            message: message,
+            content: contentBase64,
+            branch :BRANCH
+        };
+
+        if (sha) {
+            body.sha = sha;
+        } else {
+            const req = await this.request(url, "GET");
+            if (req.status === 200) {
+                const data = await req.json() as { sha: string };
+                body.sha = data.sha;
+            }
+        }
+
+        return this.request(url, "PUT", body);
+    }
+
+    /**
+     * ファイルを削除する
+     * @param path ファイルパス
+     * @param sha ハッシュ値
+     * @param message コミットメッセージ
+     */
+    public async deleteFile(path: string, sha?: string, message: string = "Delete file via Cloudflare Worker") {
+        if (!sha) sha = await this.getSha(path);
+
+        const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`;
+        const body = { message, sha, branch: BRANCH };
+
+        return this.request(url, "DELETE", body);
+    }
+
+    /**
+     * ファイルを取得する
+     * @param path ファイルパス
+     */
+    public async getFileContent(path: string) {
+        try {
+            return this.request(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`, "GET");
+        } catch {
+            return new CustomHttpError(500, "INTERNAL_SERVER_ERROR", "GitHub get file failed", e)
+        }
+    }
+    
+    /**
+     * ファイルの SHA を取得する
+     * @param path ファイルパス
+     */
+    private async getSha(path: string): Promise<string> {
+        const res = await getFileContent(path);
+        if (!res.ok)
+            throw new CustomHttpError(res.status, "NOT_FOUND", "File not found", await res.text());
+        
+        const data = await res.json() as { sha: string };
+        return data.sha;
+    }
+
+    /**
      * 記事ページの一覧
      */
     public async getPostList() {
-        try {
-            const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts`;
-            const res = await this.request(url, "GET");
+        const res = await getFileContent("_posts");
 
-            if (res.status === 404)
-                throw new HttpError(404, "NOT_FOUND", "All posts not found");
+        if (res.status === 404)
+            throw new HttpError(404, "NOT_FOUND", "All posts not found");
 
-            return res;
-        } catch (e) {
-            return Promise.reject(e);
-        }
+        return res;
     }
 
     /**
      * 固定ページの一覧
      */
     public async getStaticPageList() {
-        try {
-            const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents`;
-            const res = await this.request(url, "GET");
+        const res = await getFileContent("");
 
-            if (res.status === 404)
-                throw new HttpError(404, "NOT_FOUND", "All files not found");
+        if (res.status === 404)
+            throw new HttpError(404, "NOT_FOUND", "All files not found");
 
-            return res;
-        } catch (e) {
-            return Promise.reject(e);
-        }
+        return res;
     }
 
     /**
@@ -89,16 +147,10 @@ export class GitHubService {
     public async getPostRaw(path: string) {
         await GitHubService.checkSafePath(path);
 
-        try {
-            const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts/${path}`;
-            const res = await this.request(url, "GET");
+        const res = await getFileContent(`_posts/${path}`);
 
-            if (res.status === 404) throw new HttpError(404, "NOT_FOUND", "Post not found");
-
-            return res;
-        } catch (e) {
-            return Promise.reject(e);
-        }
+        if (res.status === 404) throw new HttpError(404, "NOT_FOUND", "Post not found");
+        return res;
     }
 
     /**
@@ -109,8 +161,7 @@ export class GitHubService {
     public async getStaticPageRaw(path: string) {
         await GitHubService.checkSafePath(path);
 
-        const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`;
-        const res = await this.request(url, "GET");
+        const res = await getFileContent(`${path}`);
 
         if (res.status === 404) 
             throw new HttpError(404, "NOT_FOUND", "Static page not found");
@@ -160,27 +211,8 @@ export class GitHubService {
     public async updateStaticPage(slug: string, content: string, message: string = "Update static page via Cloudflare Worker", sha?: string) {
         await GitHubService.checkSafePath(slug, true);
 
-        const filename = `${slug}.md`;
-
         try {
-            const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${filename}`;
-            const body: { message: string; content: string; branch: string; sha?: string } = {
-                message,
-                content: toBase64(content),
-                branch: BRANCH
-            };
-            
-            if (sha) {
-                body.sha = sha;
-            } else {
-                const req = await this.request(url, "GET");
-                if (req.status === 200) {
-                    const data = await req.json() as { sha: string };
-                    body.sha = data.sha;
-                }
-            }
-
-            return this.request(url, "PUT", body);
+            return this.uploadFile(`${slug}.md`, toBase64(content), message)
         } catch (e) {
             return Promise.reject(e);
         }
@@ -197,27 +229,8 @@ export class GitHubService {
     public async updatePost(slug: string, content: string, message: string = "Update post via Cloudflare Worker", sha?: string) {
         await GitHubService.checkSafePath(slug);
 
-        const filename = `${slug}.md`;
-
         try {
-            const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/_posts/${filename}`;
-            const body: { message: string; content: string; branch: string; sha?: string } = {
-                message: message,
-                content: toBase64(content),
-                branch: BRANCH
-            };
-            
-            if (sha) {
-                body.sha = sha;
-            } else {
-                const req = await this.request(url, "GET");
-                if (req.status === 200) {
-                    const data = await req.json() as { sha: string };
-                    body.sha = data.sha;
-                }
-            }
-
-            return this.request(url, "PUT", body);
+            return this.uploadFile(`_posts/${slug}.md`, toBase64(content), message)
         } catch (e) {
             return Promise.reject(e);
         }
@@ -244,30 +257,6 @@ export class GitHubService {
     }
 
     /**
-     * ファイルをアップロードする
-     * @param path パス
-     * @param contentBase64 base64エンコードしたデータ
-     * @param message コミットメッセージ
-     * @returns 
-     */
-    public async uploadFile(path: string, contentBase64: string, message: string = "Upload file via Cloudflare Worker") {
-        const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`
-        const body: { message: string; content: string; branch: string; sha?: string } = {
-            message: message,
-            content: contentBase64,
-            branch :BRANCH
-        };
-
-        const req = await this.request(url, "GET");
-        if (req.status === 200) {
-            const data = await req.json() as { sha: string };
-            body.sha = data.sha;
-        }
-
-        return this.request(url, "PUT", body);
-    }
-
-    /**
      * 画像をアップロードする (images/)
      * @param filename ファイル名
      * @param contentBase64 base64エンコードしたデータ
@@ -277,36 +266,6 @@ export class GitHubService {
     public async uploadImage(filename: string, contentBase64: string, message: string = "Upload image via Cloudflare Worker") {
         await GitHubService.checkSafePath(filename, true);
         return this.uploadFile(`images/${filename}`, contentBase64, message);
-    }
-    
-    /**
-     * ファイルの SHA を取得する
-     * @param path ファイルパス
-     */
-    private async getSha(path: string): Promise<string> {
-        const res = await this.request(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`, "GET");
-        if (!res.ok) {
-            throw new CustomHttpError(res.status, "NOT_FOUND", "File not found", await res.text());
-        }
-        const data = await res.json() as { sha: string };
-        return data.sha;
-    }
-
-    /**
-     * ファイルを削除する
-     * @param path ファイルパス
-     * @param sha ハッシュ値
-     * @param message コミットメッセージ
-     */
-    public async deleteFile(path: string, sha?: string, message: string = "Delete file via Cloudflare Worker") {
-        await GitHubService.checkSafePath(path, true);
-
-    if (!sha) sha = await this.getSha(path);
-
-        const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`;
-        const body = { message, sha, branch: BRANCH };
-
-        return this.request(url, "DELETE", body);
     }
 
     /**
