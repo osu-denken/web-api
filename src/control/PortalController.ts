@@ -39,15 +39,22 @@ export class PortalController extends IController {
         
         const data = await this.checkAuthAndPermission();
 
-        return createJsonResponse({
+        const portalData = {
             success: true,
             user: data,
             limits: {
                 discordInviteCode: this.env.DISCORD_INVITE,
             },
             idToken: this.authorization,
-            hasGitHubToken: !!(await this.env.USER_CUSTOM.get(data.localId))
-        });
+            hasGitHubToken: false
+        };
+
+        const raw = await this.env.USER_CUSTOM.get(data.localId);
+        const customData = JSON.parse((raw ?? `{}`));
+        if (customData.githubTokenEncoded)
+            portalData.hasGitHubToken = true;        
+
+        return createJsonResponse(portalData);
     }
 
     /**
