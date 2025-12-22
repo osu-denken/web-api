@@ -51,7 +51,7 @@ export class BlogController extends IController {
     public async getPostList() {
         if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
 
-        const res = await this.github.getPostList();
+        const res: any = await this.github.getPostList();
         const posts: any[] = await res.json();
 
         for (const post of posts) {
@@ -79,7 +79,7 @@ export class BlogController extends IController {
     public async getStaticPageList() {
         if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
 
-        const res = await this.github.getStaticPageList();
+        const res: any = await this.github.getStaticPageList();
         const pages: any[] = await res.json();
 
         for (const page of pages) {
@@ -182,7 +182,7 @@ export class BlogController extends IController {
         const cached = cachedStr ? JSON.parse(cachedStr) : null;
 
         if (!post || (post && !post.content)) {
-            const res = await this.github!.getPostRaw(`${slug}.md`);
+            const res: any = await this.github!.getPostRaw(`${slug}.md`);
             post = await res.json();
             if (!post.content) return {};
         }
@@ -232,7 +232,7 @@ export class BlogController extends IController {
     public async getListV1() {
         if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
 
-        const res = await this.github.getPostList();
+        const res: any = await this.github.getPostList();
         const data: any = await res?.json();
 
         const result = data.map((page: any) => ({
@@ -251,7 +251,7 @@ export class BlogController extends IController {
         if (slug === "") throw HttpError.createBadRequest("Query parameter 'page' is required");
         slug = `${slug}.md`;
 
-        const res = await this.github.getPostRaw(slug);
+        const res: any = await this.github.getPostRaw(slug);
         const post: any = await res.json();
 
         if (!post.content) throw new CustomHttpError(404, "NOT_FOUND", "Post not found", post);
