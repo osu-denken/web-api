@@ -30,6 +30,10 @@
 		{
 			"binding": "CACHE",
 			"id": "1cbe2bb9c077469f85cebbaaf88b618d"
+		},
+		{
+			"binding": "USER_CUSTOM",
+			"id": "7bef55fed47d43139aee5ffc64c31d7e"
 		}
 	],
 	/**
