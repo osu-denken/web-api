@@ -45,7 +45,8 @@ export class PortalController extends IController {
             limits: {
                 discordInviteCode: this.env.DISCORD_INVITE,
             },
-            idToken: this.authorization
+            idToken: this.authorization,
+            hasGitHubToken: !!(await this.env.USER_CUSTOM.get(data.localId))
         });
     }
 
