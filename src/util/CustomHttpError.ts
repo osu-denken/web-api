@@ -1,4 +1,5 @@
 import { HttpError } from "./HttpError";
+import { createJsonResponse } from "./utils";
 
 export class CustomHttpError extends HttpError {
     public data: any;
@@ -14,15 +15,14 @@ export class CustomHttpError extends HttpError {
         super.name = "CustomHttpError";
 
         this.data = data;
-    }
-
-    public toJson() {
-        const arr = {
+    }    
+    
+    public toResponse() {
+        return createJsonResponse({
             status: this.status,
             error: this.error,
             message: this.message,
             data: this.data
-        };
-        return JSON.stringify(arr, null, 2);
+        }, this.status);
     }
 }
