@@ -91,4 +91,25 @@ export class FirebaseService {
 
         return false;
     }
+
+    private async requestRefresh(refreshToken: string) {
+        const url = `https://securetoken.googleapis.com/v1/token?key=${this.apiKey}`;
+        const headers: Record<string, string> = {
+            "Content-Type": "application/json",
+            "User-Agent": "osu-denken-admin-cloudflare-worker"
+        };
+        return fetch(url, {
+            method: "POST",
+            headers,
+            body: JSON.stringify({
+                grant_type: "refresh_token",
+                refresh_token: refreshToken
+            }),
+        });
+    }
+
+    async refreshToken(refreshToken: string) {
+        const res = await this.requestRefresh(refreshToken);
+        return await res.json();
+    }
 }

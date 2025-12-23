@@ -26,6 +26,8 @@ export class UserController extends IController {
                 return await this.resetPassword();
             case "info":
                 return await this.info();
+            case "refresh":
+                return await this.refresh();
         }
 
         throw HttpError.createNotFound("Endpoint not found");
@@ -129,6 +131,37 @@ export class UserController extends IController {
         await logInfo(this.request, this.env, "update_user", `Update user "${data.localId}": ${JSON.stringify(json, null, 2)}`);
 
         return createJsonResponse(data);
+    }
+
+    /**
+     * トークンをリフレッシュする
+     */
+    public async refresh() {
+        if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
+        
+        const { refreshToken } = await this.request.json() as { refreshToken?: string };
+        if (!refreshToken) {
+            throw new HttpError(400, "BAD_REQUEST", "refreshToken is required");
+        }
+
+        const data: any = await this.firebase?.refreshToken(refreshToken);
+        
+        if (data.error) {
+            throw new HttpError(401, "UNAUTHORIZED", data.error.message);
+        }
+
+        const result = {
+            idToken: data.id_token,
+            refreshToken: data.refresh_token,
+            expiresIn: data.expires_in,
+            tokenType: data.token_type,
+            userId: data.user_id,
+            projectId: data.project_id
+        }
+
+        await logInfo(this.request, this.env, "refresh_token", `Refresh token for "${result.userId}"`);
+
+        return createJsonResponse(result);
     }
 
     /**
