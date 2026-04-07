@@ -2,13 +2,15 @@ import { HttpError } from "../util/HttpError";
 import { FirebaseService } from "../util/service/firebase";
 import { GitHubService } from "../util/service/github";
 import { MembersGSheetsService } from "../util/service/members-gs";
+import { SwitchBotService } from "../util/service/swbot";
 
 export abstract class IController {
     public path: string[];
     public firebase: FirebaseService | null = null;
     public github: GitHubService | null = null;
     public members_googlesheets: MembersGSheetsService | null = null;
-
+    public switchbot: SwitchBotService | null = null;
+    
     public request: Request | null = null;
     public authorization: string | null = null;
     public env: any = null;
@@ -41,10 +43,11 @@ export abstract class IController {
         });
     }
 
-    public setServices(firebase: FirebaseService | null, github: GitHubService | null, members_googlesheets: MembersGSheetsService | null) {
+    public setServices(firebase: FirebaseService | null, github: GitHubService | null, members_googlesheets: MembersGSheetsService | null, switchbot: SwitchBotService | null = null) {
         this.firebase = firebase;
         this.github = github;
         this.members_googlesheets = members_googlesheets;
+        this.switchbot = switchbot;
     }
 
     public setRequest(request: Request) {

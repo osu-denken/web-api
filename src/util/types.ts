@@ -8,9 +8,10 @@ export interface Env {
 	GOOGLE_DRIVE_TOKEN: string;
 	GOOGLE_SA_KEY: string;
 	SECRET_KEY: string;
+	SWBOT_TOKEN: string;
+	SWBOT_CLIENT_SECRET: string;
 
 	MEMBERS_SPREADSHEET_ID: string;
-	
 
 	// Key-Value
     BLOG_META: KVNamespace;
@@ -19,4 +20,10 @@ export interface Env {
 	MEMBERS: KVNamespace;
 	CACHE: KVNamespace;
 	USER_CUSTOM: KVNamespace;
+}
+
+export interface SwitchBotResponse {
+	statusCode: number;
+	message: string;
+	body: any;
 }

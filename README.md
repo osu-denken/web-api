@@ -212,6 +212,8 @@ Firebase Authentication を利用したユーザー管理 API である。ユー
 - **`GOOGLE_SA_KEY`**: Google Spreadsheet用のキー
 - **`MEMBERS_SPREADSHEET_ID`**: 名簿のシートID
 - **`SECRET_KEY`**: 暗号化用などのシークレットキー
+- **`SWBOT_TOKEN`**: SwitchBotのトークン
+- **`SWBOT_CLIENT_SECRET`**: SwitchBotのシークレットキー
 
 ### KV Namespace Bindings
 

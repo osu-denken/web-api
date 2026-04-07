@@ -10,6 +10,8 @@ import { PortalController } from "./control/PortalController";
 import { PingController } from "./control/PingController";
 import { MembersGSheetsService } from "./util/service/members-gs";
 import { ImageController } from "./control/ImageController";
+import { SwitchBotService } from "./util/service/swbot";
+import { SwitchBotController } from "./control/SwitchBotController";
 
 type ControllerFactory = (path: string[]) => IController;
 
@@ -20,6 +22,7 @@ const routes: Record<string, ControllerFactory> = {
   "invite": (path) => new InviteController(path),
   "image": (path) => new ImageController(path),
   "portal": (path) => new PortalController(path),
+  "switchbot": (path) => new SwitchBotController(path),
   "v1/ping" : (path) => new PingController(path),
   "v1/user": (path) => new UserController(path),
   "v1/blog": (path) => new BlogController(path),
@@ -27,6 +30,7 @@ const routes: Record<string, ControllerFactory> = {
   "v1/image": (path) => new ImageController(path),
   "v1/portal": (path) => new PortalController(path),
   "v2/blog": (path) => new BlogController(path),
+  "v1/switchbot": (path) => new SwitchBotController(path),
 };
 
 export default {
@@ -66,11 +70,12 @@ export default {
 			const github = new GitHubService(env.GITHUB_TOKEN);
 			const firebase = new FirebaseService(env.FIREBASE_API_KEY);
 			const members_googlesheets = new MembersGSheetsService(env.GOOGLE_SA_KEY, env.MEMBERS_SPREADSHEET_ID, ctx, env);
-
+			const switchbot = new SwitchBotService(env.SWBOT_TOKEN, env.SWBOT_CLIENT_SECRET);
+			
 			if (pathname === "/") return new Response("Welcome to osu-denken web-api!", { status: 200 });
 
 			if (controller) {
-				controller.setServices(firebase, github, members_googlesheets);
+				controller.setServices(firebase, github, members_googlesheets, switchbot);
 				controller.setRequest(request);
 				controller.setAuthorization(authorization);
 				controller.setEnv(env);
