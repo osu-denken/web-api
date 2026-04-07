@@ -15,6 +15,7 @@ export class SwitchBotController extends IController {
 
     public route() {
         if (this.path[1] == "validate") return this.validate();
+        if (this.path[1] == "lock") return this.lock();
         if (this.path[1] == "unlock") return this.unlock();
         if (this.path[1] == "list") return this.list();
 
