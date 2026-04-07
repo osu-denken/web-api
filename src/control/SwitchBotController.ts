@@ -23,41 +23,48 @@ export class SwitchBotController extends IController {
     }
 
     public async validate() {
-        this.checkAuthAndPermission();
+        if (!this.switchbot) throw HttpError.createInternalServerError("SwitchBot service not initialized");
+
+        const data = await this.checkAuthAndPermission();
 
         const res = await this.switchbot?.request("devices", "GET");
         if (!res) throw HttpError.createInternalServerError("SwitchBotService is not initialized");
 
-        const data = await res.json() as SwitchBotResponse;
+        const json = await res.json() as SwitchBotResponse;
 
-        if (data.statusCode === 100) {
+        if (json.statusCode === 100) {
             return createJsonResponse({ valid: true, success: true });
         }
 
-        return createJsonResponse({ valid: false, message: data.message, success: false });
+        return createJsonResponse({ valid: false, message: json.message, success: false });
     }
 
     public async list() {
-        this.checkAuthAndPermission();
+        if (!this.switchbot) throw HttpError.createInternalServerError("SwitchBot service not initialized");
+        
+        const data = await this.checkAuthAndPermission();
 
         const res = await this.switchbot?.request("devices", "GET");
         if (!res) throw HttpError.createInternalServerError("SwitchBotService is not initialized");
-        const data = await res.json() as SwitchBotResponse;
+        const json = await res.json() as SwitchBotResponse;
 
-        if (data.statusCode === 100) {
-            return createJsonResponse({ success: true, devices: data.body?.deviceList || [] });
+        if (json.statusCode === 100) {
+            return createJsonResponse({ success: true, devices: json.body?.deviceList || [] });
         }
 
-        return createJsonResponse({ success: false, message: data.message });
+        return createJsonResponse({ success: false, message: json.message });
     }
 
     public async lock() {
-        this.checkAuthAndPermission();
+        if (!this.switchbot) throw HttpError.createInternalServerError("SwitchBot service not initialized");
+
+        const data = await this.checkAuthAndPermission();
+
         const res = await this.switchbot?.request("devices", "GET");
         if (!res) throw HttpError.createInternalServerError("SwitchBotService is not initialized");
-        const data = await res.json() as SwitchBotResponse;
-        if (data.statusCode === 100) {
-            const devices = data.body?.deviceList || [];
+        const json = await res.json() as SwitchBotResponse;
+        if (json.statusCode === 100) {
+            const devices = json.body?.deviceList || [];
             const lock = devices.find((d: any) => d.type === "Smart Lock");
             if (!lock) throw HttpError.createNotFound("No Smart Lock device found");
             const res2 = await this.switchbot?.request(`devices/${lock.deviceId}/commands`, "POST", {
@@ -70,18 +77,20 @@ export class SwitchBotController extends IController {
                 return createJsonResponse({ success: true });
             }
         }
-        return createJsonResponse({ success: false, message: data.message });
+        return createJsonResponse({ success: false, message: json.message });
     }
 
     public async unlock() {
-        this.checkAuthAndPermission();
+        if (!this.switchbot) throw HttpError.createInternalServerError("SwitchBot service not initialized");
+        
+        const data = await this.checkAuthAndPermission();
 
         const res = await this.switchbot?.request("devices", "GET");
         if (!res) throw HttpError.createInternalServerError("SwitchBotService is not initialized");
-        const data = await res.json() as SwitchBotResponse;
+        const json = await res.json() as SwitchBotResponse;
 
-        if (data.statusCode === 100) {
-            const devices = data.body?.deviceList || [];
+        if (json.statusCode === 100) {
+            const devices = json.body?.deviceList || [];
             const lock = devices.find((d: any) => d.type === "Smart Lock");
             if (!lock) throw HttpError.createNotFound("No Smart Lock device found");
 
@@ -99,6 +108,6 @@ export class SwitchBotController extends IController {
             
         }
 
-        return createJsonResponse({ success: false, message: data.message });
+        return createJsonResponse({ success: false, message: json.message });
     }
 }
