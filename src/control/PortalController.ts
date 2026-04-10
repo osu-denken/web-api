@@ -28,6 +28,8 @@ export class PortalController extends IController {
         if (this.path[1] === "memberCount") return this.memberCount();
         if (this.path[1] === "member" && this.path[2] === "me") return this.memberMe();
 
+        if (this.path[1] === "univLimit") return this.limitedInfoAtUniv();
+
         throw HttpError.createNotFound("Endpoint not found");
     }
 
@@ -55,6 +57,27 @@ export class PortalController extends IController {
             portalData.hasGitHubToken = true;        
 
         return createJsonResponse(portalData);
+    }
+
+    /**
+     * 大学のIPアドレスである場合の情報を返す
+     */
+    public async limitedInfoAtUniv() {
+
+        const ip = this.request?.headers.get("CF-Connecting-IP");
+        if (ip?.startsWith("133.64.")) {
+            // 大学のIPであることが確認
+            return createJsonResponse({
+                success: true,
+                limits: {
+                    discordInviteCode: this.env.DISCORD_INVITE,
+                }
+            });
+        }
+
+        return createJsonResponse({
+            success: false
+        })
     }
 
     /**
@@ -138,9 +161,11 @@ export class PortalController extends IController {
      * Discordの招待コードを返す
      */
     public async discordInvite() {
-        if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-
-        await this.checkAuthAndPermission();
+        const ip = this.request?.headers.get("CF-Connecting-IP");
+        if (!ip?.startsWith("133.64.")) {
+            if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
+            await this.checkAuthAndPermission();
+        }
 
         return createJsonResponse({ code: this.env.DISCORD_INVITE, success: true });
     }
