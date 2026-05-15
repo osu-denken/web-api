@@ -346,10 +346,9 @@ export class BlogController extends IController {
         
         await this.github.useUserGitHubToken(this.env, data.localId);
         const page = this.request.headers.get("page");
-        const sha = this.request.headers.get("sha");
-        if (!page || !sha) throw HttpError.createBadRequest("page and sha headers are required");
+        if (!page) throw HttpError.createBadRequest("page header is required");
 
-        const res = await this.github.deletePost(`${page}`, sha);
+        const res = await this.github.deletePost(page);
         const data2: any = await res.json();
 
         data2.success = true;
@@ -367,10 +366,9 @@ export class BlogController extends IController {
         const data = await this.checkAuthAndPermission();
         await this.github.useUserGitHubToken(this.env, data.localId);
         const page = this.request.headers.get("page");
-        const sha = this.request.headers.get("sha");
-        if (!page || !sha) throw HttpError.createBadRequest("page and sha headers are required");
+        if (!page) throw HttpError.createBadRequest("page header is required");
 
-        const res = await this.github.deleteStaticPage(`${page}`, sha);
+        const res = await this.github.deleteStaticPage(page);
         const data2: any = await res.json();
 
         data2.success = true;
