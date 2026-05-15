@@ -39,6 +39,8 @@ export class BlogController extends IController {
             if (this.path[2] === "list-static") return this.getStaticPageList();
             if (this.path[2] === "get") return this.getPost();
             if (this.path[2] === "update") return this.updatePost();
+            if (this.path[2] === "delete") return this.deletePost();
+            if (this.path[2] === "delete-static") return this.deleteStaticPage();
         }
 
         throw HttpError.createNotFound("Endpoint not found");
@@ -334,6 +336,49 @@ export class BlogController extends IController {
 
         await logInfo(this.request, this.env, "blog_update", `Update blog static page "${page}" by ${data.localId}`);
 
+        return createJsonResponse(data2);
+    }
+
+    public async deletePost() {
+        if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
+        if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
+        const data = await this.checkAuthAndPermission();
+        
+        await this.github.useUserGitHubToken(this.env, data.localId);
+        const page = this.request.headers.get("page");
+        const sha = this.request.headers.get("sha");
+        if (!page || !sha) throw HttpError.createBadRequest("page and sha headers are required");
+
+        const res = await this.github.deletePost(`${page}`, sha);
+        const data2: any = await res.json();
+
+        data2.success = true;
+
+        await logInfo(this.request, this.env, "blog_delete", `Delete blog post "${page}" by ${data.localId}`);
+
+        const kvKey = `meta:${page.replace(".md", "")}`;
+        await this.env.BLOG_META.delete(kvKey);
+        return createJsonResponse(data2);
+    }
+
+    public async deleteStaticPage() {
+        if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
+        if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
+        const data = await this.checkAuthAndPermission();
+        await this.github.useUserGitHubToken(this.env, data.localId);
+        const page = this.request.headers.get("page");
+        const sha = this.request.headers.get("sha");
+        if (!page || !sha) throw HttpError.createBadRequest("page and sha headers are required");
+
+        const res = await this.github.deleteStaticPage(`${page}`, sha);
+        const data2: any = await res.json();
+
+        data2.success = true;
+
+        await logInfo(this.request, this.env, "blog_delete", `Delete blog static page "${page}" by ${data.localId}`);
+
+        const kvKey = `meta:${page.replace(".md", "")}`;
+        await this.env.BLOG_META.delete(kvKey);
         return createJsonResponse(data2);
     }
 }

@@ -305,4 +305,20 @@ export class GitHubService {
         if (token) 
             this.token = token;
     }
+
+    /**
+     * 記事ページの削除
+     */
+    public async deletePost(slug: string, message: string = "Delete post via Cloudflare Worker") {
+        await GitHubService.checkSafePath(slug);
+        return this.deleteFile(`_posts/${slug}.md`, undefined, message);
+    }
+
+    /**
+     * 固定ページの削除
+     */
+    public async deleteStaticPage(slug: string, message: string = "Delete static page via Cloudflare Worker") {
+        await GitHubService.checkSafePath(slug, true);
+        return this.deleteFile(`${slug}.md`, undefined, message);
+    }
 }
