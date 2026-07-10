@@ -134,6 +134,22 @@ export class MemberRepository {
     }
 
     /**
+     * 指定した在籍状態のいずれかに該当する一覧
+     * @param statuses 対象の在籍状態
+     */
+    public async listByStatuses(statuses: MemberStatus[]): Promise<Member[]> {
+        if (statuses.length === 0) return [];
+
+        const placeholders = statuses.map(() => "?").join(", ");
+        const { results } = await this.db
+            .prepare(`${SELECT_ALL} WHERE status IN (${placeholders}) ORDER BY student_id`)
+            .bind(...statuses)
+            .all<MemberRow>();
+
+        return results.map(toMember);
+    }
+
+    /**
      * 承認済みの部員数
      */
     public async countActive(): Promise<number> {

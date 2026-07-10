@@ -1,5 +1,5 @@
 import { HttpError } from "../util/HttpError";
-import { toPublicMember } from "../util/member";
+import { ROSTER_STATUSES, toPublicMember } from "../util/member";
 import { Permission } from "../util/permission";
 import { UserCustomService } from "../util/service/user-custom";
 import { createJsonResponse, encrypt, logInfo } from "../util/utils";
@@ -92,7 +92,8 @@ export class PortalController extends IController {
 
         await this.checkAuthAndPermission(Permission.MemberView);
 
-        const rows = await this.members.list();
+        // 仮登録と却下は名簿に出さない。承認は部員管理で行う
+        const rows = await this.members.listByStatuses(ROSTER_STATUSES);
 
         return createJsonResponse(rows.map(toPublicMember));
     }

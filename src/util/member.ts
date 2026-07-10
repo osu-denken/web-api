@@ -11,6 +11,12 @@ export type MemberStatus = "pre-active" | "active" | "withdrawn" | "graduated" |
 /** 在籍中でなくなった状態。leave_date を持つ */
 export const LEFT_STATUSES: readonly MemberStatus[] = ["withdrawn", "graduated"];
 
+/**
+ * 構成員名簿に載せる在籍状態。
+ * 仮登録 (pre-active) と却下 (rejected) は名簿には出さず、部員管理でのみ扱う。
+ */
+export const ROSTER_STATUSES: MemberStatus[] = ["active", "withdrawn", "graduated"];
+
 export interface Member {
     id: number;
     studentId: string;
