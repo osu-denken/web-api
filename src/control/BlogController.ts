@@ -59,11 +59,18 @@ export class BlogController extends IController {
         const posts: any[] = await res.json();
 
         for (const post of posts) {
-            if (!post.name.endsWith(".md")) 
+            if (!post.name.endsWith(".md"))
                 continue;
 
             post.name = post.name.replace(".md", "");
-            post.meta = await this.getMetaCached(post.name, post, slug => this.loadPostFile(slug));
+
+            // 1本のメタが取れなくても一覧そのものは返す
+            try {
+                post.meta = await this.getMetaCached(post.name, post, slug => this.loadPostFile(slug));
+            } catch (e: any) {
+                console.error(`Failed to load meta for "${post.name}":`, e?.message);
+                post.meta = {};
+            }
         }
 
         return createJsonResponse(
@@ -181,6 +188,10 @@ export class BlogController extends IController {
      */
     private async loadPostFile(slug: string) {
         const res: any = await this.github!.getPostRaw(`${slug}.md`);
+
+        // GitHub が 5xx を返すと本文は JSON ではない。読む前に弾く
+        if (!res.ok) throw new HttpError(502, "BAD_GATEWAY", `GitHub returned ${res.status} for "${slug}"`);
+
         return await res.json();
     }
 
@@ -204,6 +215,9 @@ export class BlogController extends IController {
         const cacheKey = `meta:${slug}`;
         const cachedStr = await this.env.BLOG_META.get(cacheKey);
         const cached = cachedStr ? JSON.parse(cachedStr) : null;
+
+        // 一覧の sha で先に照合する。ここで返せれば記事の数だけ GitHub を叩かずに済む
+        if (cached && entry?.sha && cached.sha === entry.sha) return cached.meta;
 
         let file = entry;
         if (!file?.content) file = await load(slug);
