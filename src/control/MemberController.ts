@@ -1,6 +1,6 @@
 import { HttpError } from "../util/HttpError";
 import { Member, MemberStatus, toAdminMember } from "../util/member";
-import { Permission, Role } from "../util/permission";
+import { normalizeRoles, Permission, Role } from "../util/permission";
 import { MemberRepository } from "../util/service/members-d1";
 import { createJsonResponse, logInfo } from "../util/utils";
 import { IController } from "./IController";
@@ -79,16 +79,23 @@ export class MemberController extends IController {
     }
 
     /**
-     * 1名分の全項目を返す。電話番号を含むため、誰がいつ誰の情報を開いたかを記録する
+     * 1名分を返す。電話番号は幹部の役職を持つ者にしか開示せず、開示は監査ログに残す
      */
     public async detail() {
         const auth = await this.checkAuthAndPermission(Permission.MemberManage);
         const target = await this.targetMember();
 
-        await logInfo(this.request!, this.env, "member_detail",
-            `Read member #${target.id} (${target.studentId}) by #${auth.member.id}`);
+        // 電話番号は重大な個人情報。MemberManage を個人付与された非幹部には見せない
+        const isExecutive = Boolean(normalizeRoles(auth.member.roleBits) & Role.Executive);
 
-        return createJsonResponse({ success: true, member: target });
+        await logInfo(this.request!, this.env, "member_detail",
+            `Read member #${target.id} (${target.studentId}) by #${auth.member.id}` +
+            `${isExecutive ? " with tel" : ""}`);
+
+        return createJsonResponse({
+            success: true,
+            member: isExecutive ? target : { ...target, tel: null }
+        });
     }
 
     /**
