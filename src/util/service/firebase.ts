@@ -85,6 +85,18 @@ export class FirebaseService {
         return await res.json();
     }
 
+    /**
+     * 確認メールを送る。大学のメールボックスを開けることの確認に使う
+     * @param idToken 登録直後のユーザーの ID トークン
+     */
+    async sendVerifyEmail(idToken: string) {
+        const res = await this.request("sendOobCode", {
+            requestType: "VERIFY_EMAIL",
+            idToken
+        });
+        return await res.json();
+    }
+
     async verifyIdToken(idToken: string): Promise<FirebaseUser> {
         const res = await this.request("lookup", { idToken });
         const data: any = await res.json();

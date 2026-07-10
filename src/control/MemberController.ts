@@ -1,9 +1,17 @@
 import { HttpError } from "../util/HttpError";
-import { Member, MemberStatus, normalizeStudentEmail, toAdminMember } from "../util/member";
+import { Member, MemberStatus, normalizeStudentEmail, normalizeStudentId, toAdminMember } from "../util/member";
 import { hasPermission, normalizeRoles, Permission, Role } from "../util/permission";
 import { MemberPatch, MemberRepository } from "../util/service/members-d1";
 import { createJsonResponse, logInfo } from "../util/utils";
 import { AuthContext, IController } from "./IController";
+
+/** 仮登録の申請本文。電話番号は任意 (本人があとで、または承認後に幹部が入れる) */
+interface RegisterBody {
+    name?: string;
+    furigana?: string | null;
+    tel?: string | null;
+    birthday?: string | null;
+}
 
 interface UpdateBody {
     id?: number;
@@ -43,6 +51,8 @@ export class MemberController extends IController {
 
     public route() {
         switch (this.path[1]) {
+            case "register":
+                return this.register();
             case "list":
                 return this.list();
             case "detail":
@@ -56,6 +66,58 @@ export class MemberController extends IController {
         }
 
         throw HttpError.createNotFound("Endpoint not found");
+    }
+
+    /**
+     * 仮登録を申請する。名簿に無い認証済みユーザーが自分で呼ぶため、
+     * MemberManage ではなく認証のみを要求する。
+     * 大学のメール確認を通していることを必須にし、他人の名で行を作れないようにする。
+     */
+    public async register() {
+        const body = await this.body<RegisterBody>();
+
+        const user = await this.checkAuth();
+        if (!user.email) throw HttpError.createUnauthorized("Email is required");
+        if (!user.email.endsWith(this.env.ALLOWED_EMAIL_DOMAIN))
+            throw HttpError.createBadRequest(`Email must be from ${this.env.ALLOWED_EMAIL_DOMAIN} domain`);
+
+        // メール確認を通すまで名簿に入れない。ここが本人性の担保になる
+        if (!user.emailVerified) throw HttpError.createForbidden("Email must be verified before registration");
+
+        if (!body.name?.trim()) throw HttpError.createBadRequest("name is required");
+
+        // 学籍番号はメールアドレスから導く。本人の申告に頼らない
+        const email = normalizeStudentEmail(user.email, this.env.ALLOWED_EMAIL_DOMAIN);
+        const studentId = normalizeStudentId(email.split("@")[0]);
+
+        await this.ensureNotRegistered(user.localId, studentId);
+
+        await this.repository.createPreActive({
+            studentId,
+            email,
+            name: body.name.trim(),
+            furigana: body.furigana?.trim() || null,
+            tel: body.tel?.trim() || null,
+            localId: user.localId,
+            customData: body.birthday ? { birthday: body.birthday } : {}
+        });
+
+        await logInfo(this.request!, this.env, "member_register", `Provisional register "${studentId}" (${email})`);
+
+        return createJsonResponse({ success: true });
+    }
+
+    /**
+     * 二重登録を防ぐ。同じ Firebase アカウントや学籍番号が既にあれば弾く
+     * @param localId Firebase Local ID
+     * @param studentId 学籍番号
+     */
+    private async ensureNotRegistered(localId: string, studentId: string): Promise<void> {
+        if (await this.repository.findByLocalId(localId))
+            throw HttpError.createBadRequest("Already registered");
+
+        if (await this.repository.findByStudentId(studentId))
+            throw HttpError.createBadRequest("This student ID is already registered");
     }
 
     private get repository(): MemberRepository {

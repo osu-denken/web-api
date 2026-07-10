@@ -144,18 +144,24 @@ export class MemberRepository {
     }
 
     /**
-     * 仮登録。承認されるまで権限は付与されない
-     * @param member 学籍番号・メールアドレス・氏名・ふりがな・電話番号
+     * 仮登録。承認されるまで権限は付与されない。
+     * 本人が認証済みで登録するので、その時点で Firebase と紐づける
+     * @param member 学籍番号・メールアドレス・氏名・ふりがな・電話番号・Firebase Local ID・任意項目
      */
-    public async createPreActive(member: Pick<Member, "studentId" | "email" | "name" | "furigana" | "tel">): Promise<void> {
+    public async createPreActive(
+        member: Pick<Member, "studentId" | "email" | "name" | "furigana" | "tel" | "localId" | "customData">
+    ): Promise<void> {
         await this.db.prepare(
-            `INSERT INTO members (student_id, email, name, furigana, tel, status) VALUES (?, ?, ?, ?, ?, 'pre-active')`
+            `INSERT INTO members (student_id, email, name, furigana, tel, local_id, custom_data, status)
+             VALUES (?, ?, ?, ?, ?, ?, ?, 'pre-active')`
         ).bind(
             normalizeStudentId(member.studentId),
             member.email.toLowerCase(),
             member.name,
             member.furigana,
-            member.tel
+            member.tel,
+            member.localId,
+            JSON.stringify(member.customData ?? {})
         ).run();
     }
 

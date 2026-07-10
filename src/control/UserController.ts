@@ -47,6 +47,8 @@ export class UserController extends IController {
                 return await this.exists();
             case "register":
                 return await this.register();
+            case "verifyEmail":
+                return await this.verifyEmail();
             case "login":
                 return await this.login();
             case "loginTotp":
@@ -124,14 +126,14 @@ export class UserController extends IController {
 
         let { email, password, passphrase } = await this.request.json() as { email: string; password: string, passphrase: string };
 
+        // 合言葉も招待コードも無ければ自己登録。誰でも仮登録できるが、
+        // 大学のメールボックスを開けることを確認メールで確かめてもらう
         const isMasterPassphrase = timingSafeEqual(passphrase ?? "", this.env.REGISTER_PASSPHRASE);
+        const isInvite = !isMasterPassphrase && Boolean(passphrase) && Boolean(await this.env.INVITE_CODE.get(passphrase));
+        const isSelfRegister = !isMasterPassphrase && !isInvite;
 
-        if (!isMasterPassphrase) {
-            const localId = await this.env.INVITE_CODE.get(passphrase);
-            if (!localId) {
-                throw new HttpError(403, "FORBIDDEN", "Invalid passphrase or invite code");
-            }
-        }
+        if (isSelfRegister && passphrase)
+            throw new HttpError(403, "FORBIDDEN", "Invalid passphrase or invite code");
 
         if (!email || !password) {
             throw new HttpError(400, "BAD_REQUEST", "email and password are required");
@@ -144,12 +146,33 @@ export class UserController extends IController {
         const data: any = await this.firebase?.registerUser(email, password);
         data.success = true;
 
-        if (!isMasterPassphrase)
+        // 自己登録は本人確認が済んでいないので、確認メールを送って verified を待つ
+        if (isSelfRegister && data.idToken) {
+            await this.firebase?.sendVerifyEmail(data.idToken);
+            data.verificationRequired = true;
+        }
+
+        if (isInvite)
             await this.env.INVITE_CODE.delete(passphrase);
 
-        await logInfo(this.request, this.env, "register", `Register user "${email}" with code: ${isMasterPassphrase ? "REGISTER_PASSPHRASE" : passphrase}`);
+        const via = isMasterPassphrase ? "REGISTER_PASSPHRASE" : isInvite ? passphrase : "self-register";
+        await logInfo(this.request, this.env, "register", `Register user "${email}" with code: ${via}`);
 
         return createJsonResponse(data);
+    }
+
+    /**
+     * ログイン中のユーザーへ確認メールを送り直す
+     */
+    public async verifyEmail() {
+        if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
+        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
+
+        await this.rateLimit("registerIp");
+
+        await this.firebase?.sendVerifyEmail(this.authorization);
+
+        return createJsonResponse({ success: true });
     }
 
     /**
