@@ -1,5 +1,5 @@
 import { HttpError } from "../util/HttpError";
-import { Member, MemberStatus } from "../util/member";
+import { Member, MemberStatus, toAdminMember } from "../util/member";
 import { Permission, Role } from "../util/permission";
 import { MemberRepository } from "../util/service/members-d1";
 import { createJsonResponse, logInfo } from "../util/utils";
@@ -26,6 +26,8 @@ export class MemberController extends IController {
         switch (this.path[1]) {
             case "list":
                 return this.list();
+            case "detail":
+                return this.detail();
             case "approve":
                 return this.approve();
             case "reject":
@@ -65,7 +67,7 @@ export class MemberController extends IController {
     }
 
     /**
-     * 名簿の全項目を一覧する
+     * 名簿を一覧する (電話番号は含まない)
      */
     public async list() {
         await this.checkAuthAndPermission(Permission.MemberManage);
@@ -73,7 +75,20 @@ export class MemberController extends IController {
         const status = this.url?.searchParams.get("status") as MemberStatus | null;
         const rows = await this.repository.list(status ?? undefined);
 
-        return createJsonResponse({ success: true, members: rows });
+        return createJsonResponse({ success: true, members: rows.map(toAdminMember) });
+    }
+
+    /**
+     * 1名分の全項目を返す。電話番号を含むため、誰がいつ誰の情報を開いたかを記録する
+     */
+    public async detail() {
+        const auth = await this.checkAuthAndPermission(Permission.MemberManage);
+        const target = await this.targetMember();
+
+        await logInfo(this.request!, this.env, "member_detail",
+            `Read member #${target.id} (${target.studentId}) by #${auth.member.id}`);
+
+        return createJsonResponse({ success: true, member: target });
     }
 
     /**

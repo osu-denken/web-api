@@ -28,6 +28,14 @@ export interface Member {
     customData: Record<string, any>;
 }
 
+/** 部員管理画面の一覧用。電話番号は含めない */
+export interface AdminMember extends PublicMember {
+    id: number;
+    email: string;
+    permBits: Permission;
+    approvedAt: string | null;
+}
+
 /** 名簿から外部へ返してよい項目 (部員内であっても取り扱いに注意) */
 export interface PublicMember {
     studentId: string;
@@ -78,5 +86,20 @@ export function toPublicMember(member: Member): PublicMember {
         roleBits: member.roleBits,
         joinDate: member.joinDate,
         leaveDate: member.leaveDate
+    };
+}
+
+/**
+ * 部員管理画面の一覧用の写像。
+ * 電話番号は重大な個人情報なので一覧には載せず、1名ずつの取得に限る。
+ * @param member 部員
+ */
+export function toAdminMember(member: Member): AdminMember {
+    return {
+        ...toPublicMember(member),
+        id: member.id,
+        email: member.email,
+        permBits: member.permBits,
+        approvedAt: member.approvedAt
     };
 }
