@@ -101,6 +101,9 @@ const toStatus = (roleCell, leaveDate) => {
 const sqlString = (value) =>
     value === null || value === undefined || value === "" ? "NULL" : `'${String(value).replace(/'/g, "''")}'`;
 
+/** "2022/05/26" のような表記を ISO8601 に揃える。input[type=date] が読めるようにするため */
+const toIsoDate = (value) => value.replace(/\//g, "-");
+
 const path = process.argv[2];
 if (!path) {
     console.error("usage: node scripts/csv-to-members-sql.mjs <members.csv>");
@@ -138,8 +141,8 @@ for (const row of rows) {
             sqlString(col(row, "tel")),
             sqlString(toStatus(roleCell, leaveDate)),
             toRoleBits(roleCell),
-            sqlString(col(row, "joinDate")),
-            sqlString(leaveDate),
+            sqlString(toIsoDate(col(row, "joinDate"))),
+            sqlString(toIsoDate(leaveDate)),
             sqlString(JSON.stringify(customData)),
         ].join(", ") +
         `)\n` +
