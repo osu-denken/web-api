@@ -129,8 +129,10 @@ export class UserController extends IController {
             { email: string; password: string, passphrase: string, turnstileToken?: string };
 
         // 合言葉も招待コードも無ければ自己登録。誰でも仮登録できるが、
-        // 大学のメールボックスを開けることを確認メールで確かめてもらう
-        const isMasterPassphrase = timingSafeEqual(passphrase ?? "", this.env.REGISTER_PASSPHRASE);
+        // 大学のメールボックスを開けることを確認メールで確かめてもらう。
+        // 空の合言葉・空のシークレットをマスター一致と誤認しないよう、両方が非空であることを要る
+        const isMasterPassphrase = Boolean(passphrase) && Boolean(this.env.REGISTER_PASSPHRASE)
+            && timingSafeEqual(passphrase, this.env.REGISTER_PASSPHRASE);
         const isInvite = !isMasterPassphrase && Boolean(passphrase) && Boolean(await this.env.INVITE_CODE.get(passphrase));
         const isSelfRegister = !isMasterPassphrase && !isInvite;
 
