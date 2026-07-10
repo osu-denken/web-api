@@ -1,6 +1,7 @@
 import { HttpError } from "../util/HttpError";
 import { normalizeStudentEmail } from "../util/member";
 import { RateLimiter, RATE_LIMITS } from "../util/service/rate-limit";
+import { TurnstileService } from "../util/service/turnstile";
 import { UserCustomService } from "../util/service/user-custom";
 import { generateTotpSecret, otpauthUrl, verifyTotp } from "../util/totp";
 import { createJsonResponse, decrypt, encrypt, generateInviteCode, logInfo, sha256, timingSafeEqual } from "../util/utils";
@@ -124,7 +125,8 @@ export class UserController extends IController {
 
         await this.rateLimit("registerIp");
 
-        let { email, password, passphrase } = await this.request.json() as { email: string; password: string, passphrase: string };
+        let { email, password, passphrase, turnstileToken } = await this.request.json() as
+            { email: string; password: string, passphrase: string, turnstileToken?: string };
 
         // 合言葉も招待コードも無ければ自己登録。誰でも仮登録できるが、
         // 大学のメールボックスを開けることを確認メールで確かめてもらう
@@ -134,6 +136,11 @@ export class UserController extends IController {
 
         if (isSelfRegister && passphrase)
             throw new HttpError(403, "FORBIDDEN", "Invalid passphrase or invite code");
+
+        // 招待経由は部員が門番になっているので、bot 確認は開かれた自己登録にだけ課す
+        if (isSelfRegister)
+            await new TurnstileService(this.env.TURNSTILE_SECRET_KEY)
+                .verify(turnstileToken, this.request.headers.get("CF-Connecting-IP"));
 
         if (!email || !password) {
             throw new HttpError(400, "BAD_REQUEST", "email and password are required");

@@ -5,6 +5,7 @@ export interface Env {
 	FIREBASE_API_KEY: string;
 	DISCORD_INVITE: string;
 	REGISTER_PASSPHRASE: string;
+	TURNSTILE_SECRET_KEY: string;
 	GOOGLE_DRIVE_TOKEN: string;
 	SECRET_KEY: string;
 	SWBOT_TOKEN: string;
