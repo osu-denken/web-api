@@ -1,5 +1,5 @@
 import { HttpError } from "../util/HttpError";
-import { Member, MemberStatus, toAdminMember } from "../util/member";
+import { Member, MemberStatus, normalizeStudentEmail, toAdminMember } from "../util/member";
 import { hasPermission, normalizeRoles, Permission, Role } from "../util/permission";
 import { MemberPatch, MemberRepository } from "../util/service/members-d1";
 import { createJsonResponse, logInfo } from "../util/utils";
@@ -190,7 +190,7 @@ export class MemberController extends IController {
             patch.furigana = body.furigana || null;
 
         if (body.email !== undefined && body.email.toLowerCase() !== target.email)
-            patch.email = this.validateEmail(body.email);
+            patch.email = normalizeStudentEmail(body.email, this.env.ALLOWED_EMAIL_DOMAIN);
 
         if (body.joinDate !== undefined && body.joinDate !== target.joinDate)
             patch.joinDate = body.joinDate || null;
@@ -238,19 +238,6 @@ export class MemberController extends IController {
             status: body.status,
             leaveDate: body.leaveDate || new Date().toISOString().slice(0, 10)
         };
-    }
-
-    /**
-     * 大学のドメインのメールアドレスのみを許す
-     * @param email 入力されたメールアドレス
-     */
-    private validateEmail(email: string): string {
-        const normalized = email.trim().toLowerCase();
-
-        if (!normalized.endsWith(this.env.ALLOWED_EMAIL_DOMAIN))
-            throw HttpError.createBadRequest(`Email must be from ${this.env.ALLOWED_EMAIL_DOMAIN} domain`);
-
-        return normalized;
     }
 
     private require(auth: AuthContext, required: Permission) {

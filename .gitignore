@@ -1,6 +1,7 @@
 members.csv
 migrations/*_seed_members.sql
 migrations/*_link_accounts.sql
+member.spec.ts
 
 # Logs
 

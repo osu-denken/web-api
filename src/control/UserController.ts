@@ -1,4 +1,5 @@
 import { HttpError } from "../util/HttpError";
+import { normalizeStudentEmail } from "../util/member";
 import { createJsonResponse, logInfo, timingSafeEqual } from "../util/utils";
 import { IController } from "./IController";
 
@@ -34,17 +35,7 @@ export class UserController extends IController {
     }
 
     private normalizeEmail(email: string): string {
-        if (!email.includes("@")) email += `@ge.osaka-sandai.ac.jp`;
-
-        if (!email.match(/@(.+?)\.osaka-sandai\.ac\.jp$/)) {
-            throw new HttpError(400, "BAD_REQUEST", "Email must be from osaka-sandai.ac.jp domain");
-        }
-
-        email = email.toLowerCase();
-        if (!email.startsWith("s")) {
-            email = `s` + email;
-        }
-        return email;
+        return normalizeStudentEmail(email, this.env.ALLOWED_EMAIL_DOMAIN);
     }
 
     /**
