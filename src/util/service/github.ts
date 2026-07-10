@@ -235,6 +235,18 @@ export class GitHubService {
     }
 
     /**
+     * 画像の一覧 (images/)
+     */
+    public async getImageList() {
+        const res = await this.getFileContent("images");
+
+        if (res.status === 404)
+            throw new HttpError(404, "NOT_FOUND", "Image directory not found");
+
+        return res;
+    }
+
+    /**
      * 画像をアップロードする (images/)
      * @param filename ファイル名
      * @param contentBase64 base64エンコードしたデータ

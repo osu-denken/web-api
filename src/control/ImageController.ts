@@ -13,17 +13,46 @@ export class ImageController extends IController {
 
     public constructor(path: string[]) {
         super(path);
+
         if (path.length < 3) {
+            const action = path[1] ?? "upload";
             path[0] = "v1";
             path[1] = "image";
-            path[2] = "upload";
+            path[2] = action;
         }
     }
 
     public route() {
+        if (this.path[2] === "list") return this.list();
         if (this.path[2] === "upload") return this.upload();
         if (this.path[2] === "delete") return this.delete();
         throw HttpError.createNotFound("Endpoint not found");
+    }
+
+    /**
+     * images/ 配下の画像を一覧する
+     * @returns JsonResponse
+     */
+    public async list() {
+        if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
+
+        await this.checkAuthAndPermission(Permission.BlogEdit);
+
+        const res = await this.github.getImageList();
+        if (!res.ok) throw new CustomHttpError(500, "INTERNAL_SERVER_ERROR", "GitHub list failed", await res.text());
+
+        const entries: any[] = await res.json();
+
+        return createJsonResponse(
+            entries
+                .filter(entry => entry.type === "file" && this.isImageName(entry.name))
+                .map(entry => ({
+                    name: entry.name,
+                    sha: entry.sha,
+                    size: entry.size,
+                    url: `/images/${entry.name}`
+                }))
+        );
     }
 
     public async upload() {
@@ -85,6 +114,10 @@ export class ImageController extends IController {
         await logInfo(this.request, this.env, "image", `Deleted image "${filename}" by ${data.localId}`);
 
         return createJsonResponse({ success: true, filename });
+    }
+
+    private isImageName(name: string) {
+        return /\.(jpg|jpeg|png|webp|gif)$/i.test(name);
     }
 
     private isImage(type: string) {
