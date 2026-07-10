@@ -35,8 +35,8 @@
 	"d1_databases": [
 		{
 			"binding": "DB",
-			"database_name": "osu-denken-members",
-			"database_id": "1c06c677-0c6b-4add-b3ac-8ddba782d852",
+			"database_name": "members",
+			"database_id": "2ddac16e-eacb-42b5-ba85-42f21768e81f",
 			"migrations_dir": "migrations"
 		}
 	],
