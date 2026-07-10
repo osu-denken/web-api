@@ -272,13 +272,19 @@ Firebase Authentication を利用したユーザー管理 API である。ユー
 
 ## レート制限
 
-認証まわりのエンドポイントには、接続元IPごとの回数制限がある。超えると `429 TOO_MANY_REQUESTS` を返す。
+認証まわりのエンドポイントには回数制限がある。超えると `429 TOO_MANY_REQUESTS` を返す。
 
-| エンドポイント | 窓 | 回数 |
-| --- | --- | --- |
-| `POST /user/login` | 5分 | 10 |
-| `POST /user/register` | 1時間 | 5 |
-| `POST /user/resetPassword` | 1時間 | 5 |
+学内からは NAT 越しに全員が同じIPに見えるため、主となる窓はメールアドレス単位である。
+IP単位の窓はそれに緩く重ねてあり、アカウントを次々に変えて試す相手を止めるためのものである。
+
+| エンドポイント | 単位 | 窓 | 回数 |
+| --- | --- | --- | --- |
+| `POST /user/login` | メールアドレス | 5分 | 10 |
+| `POST /user/login` | IP | 5分 | 100 |
+| `POST /user/register` | メールアドレス | 1時間 | 5 |
+| `POST /user/register` | IP | 1時間 | 30 |
+| `POST /user/resetPassword` | メールアドレス | 1時間 | 5 |
+| `POST /user/resetPassword` | IP | 1時間 | 30 |
 
 2段階認証のコード入力だけは別で、ログイン1回につき5回まで試せる (`MFA_MAX_ATTEMPTS`)。
 

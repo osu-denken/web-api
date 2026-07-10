@@ -4,7 +4,14 @@ import { Permission } from "../util/permission";
 import { b64ToStr, createFrontMatter, createJsonResponse, logInfo, parseFrontMatter } from "../util/utils";
 import { IController } from "./IController";
 
-export class BlogController extends IController {    
+/** POST /v2/blog/update の本文 */
+interface UpdateBody {
+    page?: string;
+    meta?: Record<string, any>;
+    content?: string;
+}
+
+export class BlogController extends IController {
     public getParentPath(): string {
         return "blog";
     }
@@ -133,20 +140,20 @@ export class BlogController extends IController {
 
         await this.github.useUserGitHubToken(this.env, data.localId);
 
-        const page = this.request.headers.get("page");
-        const _meta = this.request.headers.get("meta");
-        const _content = this.request.headers.get("content") || await this.request.text();
-        
-        if (!page || !_content || !_meta) throw HttpError.createBadRequest("page, meta and content headers are required");
-        
-        let meta: any = {};
+        // メタデータはヘッダの長さ制限に収まらないことがあるので本文で受け取る
+        let body: UpdateBody;
         try {
-            meta = JSON.parse(_meta);
+            body = await this.request.json() as UpdateBody;
         } catch (e) {
-            throw HttpError.createBadRequest("meta header is not valid JSON");
+            throw HttpError.createBadRequest("Request body is not valid JSON");
         }
 
-        const content = createFrontMatter(meta, _content as string);
+        const page = body.page ?? this.request.headers.get("page");
+        const { meta, content: _content } = body;
+
+        if (!page || !_content || !meta) throw HttpError.createBadRequest("page, meta and content are required");
+
+        const content = createFrontMatter(meta, _content);
 
         const res = await this.github.updatePost(`${page}`, content);
         const data2: any = await res.json();

@@ -55,6 +55,10 @@ export class HttpError extends Error {
         return this.createMethodNotAllowed("Method Not Allowed: POST only");
     }
 
+    public static createTooManyRequests(message: string = "Too Many Requests") {
+        return new HttpError(429, "TOO_MANY_REQUESTS", message);
+    }
+
     public static createNotImplemented(message: string = "Not Implemented") {
         throw new HttpError(501, "NOT_IMPLEMENTED", message);
     }

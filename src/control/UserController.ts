@@ -1,5 +1,6 @@
 import { HttpError } from "../util/HttpError";
 import { normalizeStudentEmail } from "../util/member";
+import { RateLimiter, RATE_LIMITS } from "../util/service/rate-limit";
 import { UserCustomService } from "../util/service/user-custom";
 import { generateTotpSecret, otpauthUrl, verifyTotp } from "../util/totp";
 import { createJsonResponse, decrypt, encrypt, generateInviteCode, logInfo, sha256, timingSafeEqual } from "../util/utils";
@@ -70,6 +71,15 @@ export class UserController extends IController {
     }
 
     /**
+     * 総当たりを防ぐ。回数を数えるのは検証の前
+     * @param action RATE_LIMITS のキー
+     * @param subject 数える単位。省略すると接続元IPで数える
+     */
+    private async rateLimit(action: keyof typeof RATE_LIMITS, subject?: string): Promise<void> {
+        await new RateLimiter(this.env).consume(this.request!, action, subject);
+    }
+
+    /**
      * 2段階認証の登録・解除
      */
     private async totp() {
@@ -110,6 +120,8 @@ export class UserController extends IController {
     public async register() {
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
 
+        await this.rateLimit("registerIp");
+
         let { email, password, passphrase } = await this.request.json() as { email: string; password: string, passphrase: string };
 
         const isMasterPassphrase = timingSafeEqual(passphrase ?? "", this.env.REGISTER_PASSPHRASE);
@@ -126,6 +138,8 @@ export class UserController extends IController {
         }
 
         email = this.normalizeEmail(email);
+
+        await this.rateLimit("register", email);
 
         const data: any = await this.firebase?.registerUser(email, password);
         data.success = true;
@@ -144,12 +158,16 @@ export class UserController extends IController {
     public async login() {
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
 
+        await this.rateLimit("loginIp");
+
         let { email, password } = await this.request.json() as { email: string; password: string };
         if (!email || !password) {
             throw new HttpError(400, "BAD_REQUEST", "email and password are required");
         }
 
         email = this.normalizeEmail(email);
+
+        await this.rateLimit("login", email);
 
         const data: any = await this.firebase?.loginUser(email, password);
 
@@ -420,11 +438,15 @@ export class UserController extends IController {
      */
     public async resetPassword() {
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-        
+
+        await this.rateLimit("resetPasswordIp");
+
         const { email } = await this.request.json() as { email?: string };
         if (!email) {
             throw new HttpError(400, "BAD_REQUEST", "email is required");
         }
+
+        await this.rateLimit("resetPassword", email.trim().toLowerCase());
 
         const data: any = await this.firebase?.resetPassword(email);
         data.success = true;
