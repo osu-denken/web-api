@@ -1,5 +1,6 @@
 import { CustomHttpError } from "../util/CustomHttpError";
 import { HttpError } from "../util/HttpError";
+import { Permission } from "../util/permission";
 import { toBase64, createJsonResponse, logInfo } from "../util/utils";
 import { IController } from "./IController";
 
@@ -29,8 +30,8 @@ export class ImageController extends IController {
         if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
 
-        const data = await this.checkAuthAndPermission();
-        
+        const { user: data } = await this.checkAuthAndPermission(Permission.BlogEdit);
+
         await this.github.useUserGitHubToken(this.env, data.localId);
 
         const contentType = this.request.headers.get("content-type") || "";
@@ -70,8 +71,8 @@ export class ImageController extends IController {
         if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
         
-        const data = await this.checkAuthAndPermission();
-        
+        const { user: data } = await this.checkAuthAndPermission(Permission.BlogEdit);
+
         await this.github.useUserGitHubToken(this.env, data.localId);
 
         const body: any = await this.request.json();

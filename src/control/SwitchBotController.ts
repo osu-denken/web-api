@@ -1,4 +1,5 @@
 import { HttpError } from "../util/HttpError";
+import { Permission } from "../util/permission";
 import { SwitchBotResponse } from "../util/types";
 import { createJsonResponse, logInfo } from "../util/utils";
 import { IController } from "./IController";
@@ -56,7 +57,7 @@ export class SwitchBotController extends IController {
     private async fetchDevices(): Promise<SwitchBotResponse> {
         if (!this.switchbot) throw HttpError.createInternalServerError("SwitchBot service not initialized");
 
-        await this.checkAuthAndPermission();
+        await this.checkAuthAndPermission(Permission.SwitchBotControl);
 
         const res = await this.switchbot.request("devices", "GET");
         return await res.json() as SwitchBotResponse;

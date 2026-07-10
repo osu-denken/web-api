@@ -1,16 +1,27 @@
 import { HttpError } from "../util/HttpError";
+import { effectivePermissions, Member } from "../util/member";
+import { hasPermission, Permission } from "../util/permission";
 import { FirebaseService, FirebaseUser } from "../util/service/firebase";
 import { GitHubService } from "../util/service/github";
-import { MembersGSheetsService } from "../util/service/members-gs";
+import { MemberRepository } from "../util/service/members-d1";
 import { SwitchBotService } from "../util/service/swbot";
+
+/**
+ * 認証と権限解決の結果
+ */
+export interface AuthContext {
+    user: FirebaseUser;
+    member: Member;
+    permissions: Permission;
+}
 
 export abstract class IController {
     public path: string[];
     public firebase: FirebaseService | null = null;
     public github: GitHubService | null = null;
-    public members_googlesheets: MembersGSheetsService | null = null;
+    public members: MemberRepository | null = null;
     public switchbot: SwitchBotService | null = null;
-    
+
     public request: Request | null = null;
     public authorization: string | null = null;
     public env: any = null;
@@ -28,7 +39,7 @@ export abstract class IController {
      * ルーティング
      */
     public abstract route() : Promise<any> | any;
-    
+
     public async toResponse() {
         const res = await this.route();
         if (res instanceof Response)
@@ -39,10 +50,10 @@ export abstract class IController {
         });
     }
 
-    public setServices(firebase: FirebaseService | null, github: GitHubService | null, members_googlesheets: MembersGSheetsService | null, switchbot: SwitchBotService | null = null) {
+    public setServices(firebase: FirebaseService | null, github: GitHubService | null, members: MemberRepository | null, switchbot: SwitchBotService | null = null) {
         this.firebase = firebase;
         this.github = github;
-        this.members_googlesheets = members_googlesheets;
+        this.members = members;
         this.switchbot = switchbot;
     }
 
@@ -53,7 +64,7 @@ export abstract class IController {
     public setAuthorization(authorization: string | null) {
         this.authorization = authorization;
         if (this.authorization == null) return;
- 
+
         this.authorization = this.authorization.replace("Bearer ", "");
     }
 
@@ -68,41 +79,6 @@ export abstract class IController {
     public setCtx(ctx: any) {
         this.ctx = ctx;
     }
-    
-    /**
-     * 権限があるか、なければエラーを出す
-     * @param studentId 学籍番号
-     */
-    public async checkPermission(studentId: string) {
-        if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
-
-        const hasPermission: boolean = await this.members_googlesheets.hasPermission(studentId);
-        if (!hasPermission) throw HttpError.createForbidden("You are not have permissions");
-    }
-
-    /**
-     * 権限があるか、なければエラーを出す
-     * @param email 大学付与のメールアドレス
-     */
-    public async checkPermissionByEmail(email?: string) {
-        if (!email) throw HttpError.createUnauthorized("Email is required for permission check");
-        if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
-        if (!email.endsWith(this.env.ALLOWED_EMAIL_DOMAIN)) throw HttpError.createBadRequest(`Email must be from ${this.env.ALLOWED_EMAIL_DOMAIN} domain`);
-
-        const hasPermission: boolean = await this.members_googlesheets.hasPermissionByEmail(email);
-        if (!hasPermission) throw HttpError.createForbidden("You are not have permissions");
-    }
-    
-    /**
-     * 認証と権限をチェックする
-     * @returns 認証データ
-     */
-    protected async checkAuthAndPermission(): Promise<FirebaseUser> {
-        const user = await this.checkAuth();
-        await this.checkPermissionByEmail(user.email);
-
-        return user;
-    }
 
     /**
      * 認証チェックをする
@@ -113,5 +89,39 @@ export abstract class IController {
         if (!this.firebase) throw HttpError.createInternalServerError("Firebase service not initialized");
 
         return await this.firebase.verifyIdToken(this.authorization);
+    }
+
+    /**
+     * 認証し、名簿を引いて実効権限を求める
+     * @returns 認証データと名簿と実効権限
+     */
+    protected async resolveAuth(): Promise<AuthContext> {
+        if (!this.members) throw HttpError.createInternalServerError("Member repository not initialized");
+
+        const user = await this.checkAuth();
+        if (!user.email) throw HttpError.createUnauthorized("Email is required for permission check");
+        if (!user.email.endsWith(this.env.ALLOWED_EMAIL_DOMAIN))
+            throw HttpError.createBadRequest(`Email must be from ${this.env.ALLOWED_EMAIL_DOMAIN} domain`);
+
+        const member = await this.members.requireByEmail(user.email);
+
+        // 初回認証時に Firebase アカウントと名簿を紐づける
+        if (!member.localId) await this.members.linkLocalId(member.id, user.localId);
+
+        return { user, member, permissions: effectivePermissions(member) };
+    }
+
+    /**
+     * 認証と権限をチェックする
+     * @param required 必要な権限
+     * @returns 認証データと名簿と実効権限
+     */
+    protected async checkAuthAndPermission(required: Permission): Promise<AuthContext> {
+        const auth = await this.resolveAuth();
+
+        if (!hasPermission(auth.permissions, required))
+            throw HttpError.createForbidden("You are not have permissions");
+
+        return auth;
     }
 }

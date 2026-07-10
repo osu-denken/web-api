@@ -1,8 +1,11 @@
 import { HttpError } from "../util/HttpError";
+import { toPublicMember } from "../util/member";
+import { Permission } from "../util/permission";
+import { UserCustomService } from "../util/service/user-custom";
 import { createJsonResponse, encrypt, logInfo } from "../util/utils";
 import { IController } from "./IController";
 
-export class PortalController extends IController {    
+export class PortalController extends IController {
     public getParentPath(): string {
         return "portal";
     }
@@ -19,12 +22,12 @@ export class PortalController extends IController {
 
 
         if (this.path[0] === "discord" && this.path[1] === "invite") return this.discordInvite();
-    
-        if (this.path[0] !== "portal") 
+
+        if (this.path[0] !== "portal")
             throw HttpError.createNotFound("Endpoint not found");
 
         if (this.path.length === 1) return this.portal();
-        if (this.path[1] === "members") return this.members();
+        if (this.path[1] === "members") return this.memberList();
         if (this.path[1] === "memberCount") return this.memberCount();
         if (this.path[1] === "member" && this.path[2] === "me") return this.memberMe();
 
@@ -33,42 +36,29 @@ export class PortalController extends IController {
         throw HttpError.createNotFound("Endpoint not found");
     }
 
+    private get userCustom(): UserCustomService {
+        return new UserCustomService(this.env);
+    }
+
     /**
      * 部員ポータル用にまとめた情報を返す
      */
     public async portal() {
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-        
-        const data = await this.checkAuthAndPermission();
 
-        const customData = await this.readUserCustom(data.localId);
+        const auth = await this.checkAuthAndPermission(Permission.DiscordInviteView);
+        const customData = await this.userCustom.get(auth.user.localId);
 
         return createJsonResponse({
             success: true,
-            user: data,
+            user: auth.user,
+            permissions: auth.permissions,
+            roleBits: auth.member.roleBits,
             limits: {
                 discordInviteCode: this.env.DISCORD_INVITE,
             },
             hasGitHubToken: Boolean(customData.githubTokenEncoded)
         });
-    }
-
-    /**
-     * ユーザー固有データを読む
-     * @param localId Firebase Local ID
-     */
-    private async readUserCustom(localId: string): Promise<Record<string, any>> {
-        const raw = await this.env.USER_CUSTOM.get(localId);
-        return JSON.parse(raw ?? `{}`);
-    }
-
-    /**
-     * ユーザー固有データを書く
-     * @param localId Firebase Local ID
-     * @param customData ユーザー固有データ
-     */
-    private async writeUserCustom(localId: string, customData: Record<string, any>) {
-        await this.env.USER_CUSTOM.put(localId, JSON.stringify(customData, null, 2));
     }
 
     /**
@@ -95,69 +85,49 @@ export class PortalController extends IController {
     /**
      * 名簿データ一覧を返す (部員内であっても取り扱いに注意すること)
      */
-    public async members() {
-        if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
-        
-        await this.checkAuthAndPermission();
+    public async memberList() {
+        if (!this.members) throw HttpError.createInternalServerError("Member repository not initialized");
 
-        const members = await this.members_googlesheets.getMembersWithCache();
-        const response = createJsonResponse(members);
+        await this.checkAuthAndPermission(Permission.MemberView);
 
-        return response;
-    }
+        const rows = await this.members.list();
 
-    /**
-     * パーミッションチェック
-     */
-    public async hasPermission() {
-        const studentId = this.url?.searchParams.get("id");
-        if (!studentId) throw HttpError.createBadRequest("param has not id");
-
-        await this.checkPermission(studentId);
-
-        return new Response("yes");
+        return createJsonResponse(rows.map(toPublicMember));
     }
 
     /**
      * ユーザの名簿データを返す
      */
     public async memberMe() {
-        if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
-        
-        const data = await this.checkAuth();
-        if (!data.email) throw HttpError.createUnauthorized("Email is required");
+        const auth = await this.resolveAuth();
 
-        const studentId = data.email.split("@")[0];
-        const member: any = await this.members_googlesheets.getMemberWithCache(studentId);
-
-        return createJsonResponse(member);
+        return createJsonResponse(auth.member);
     }
 
     /**
      * 部員数を取得する
      */
     public async memberCount() {
-        if (!this.members_googlesheets) throw HttpError.createInternalServerError("GoogleSheets service of members not initialized");
+        if (!this.members) throw HttpError.createInternalServerError("Member repository not initialized");
 
-        const rows = await this.members_googlesheets.getMembersWithCache();
-        return createJsonResponse(rows.length);
+        return createJsonResponse(await this.members.countActive());
     }
-        
+
 
     /**
      * GitHub Organizationに招待する
      */
     public async githubInvite() {
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-        
-        await this.checkAuthAndPermission();
+
+        await this.checkAuthAndPermission(Permission.MemberManage);
 
         const { email } = await this.request.json() as { email: string };
         if (!email) throw new HttpError(400, "BAD_REQUEST", "email is required");
 
         const res = await this.github?.inviteOrganization(email);
         if (!res) throw new HttpError(500, "INTERNAL_SERVER_ERROR", "GitHub service not available");
-        
+
         const data2: any = await res.json();
 
         if (!res.ok) {
@@ -177,7 +147,7 @@ export class PortalController extends IController {
         const ip = this.request?.headers.get("CF-Connecting-IP");
         if (!ip?.startsWith("133.64.")) {
             if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-            await this.checkAuthAndPermission();
+            await this.checkAuthAndPermission(Permission.DiscordInviteView);
         }
 
         return createJsonResponse({ code: this.env.DISCORD_INVITE, success: true });
@@ -187,47 +157,47 @@ export class PortalController extends IController {
      * GitHub Token の設定
      */
     public async githubToken() {
-        const data = await this.checkAuthAndPermission();
+        const auth = await this.checkAuthAndPermission(Permission.BlogEdit);
 
         switch (this.request?.method) {
             case "GET":
-                return await this.getGitHubToken(data.localId);
+                return await this.getGitHubToken(auth.user.localId);
             case "POST":
             case "PUT":
-                return await this.putGitHubToken(data.localId);
+                return await this.putGitHubToken(auth.user.localId);
             case "DELETE":
-                return await this.deleteGitHubToken(data.localId);
+                return await this.deleteGitHubToken(auth.user.localId);
         }
 
         return createJsonResponse({ success: false });
     }
 
     private async getGitHubToken(localId: string) {
-        const customData = await this.readUserCustom(localId);
+        const customData = await this.userCustom.get(localId);
 
         return createJsonResponse({ success: true, isExist: Boolean(customData.githubTokenEncoded) });
     }
 
     private async putGitHubToken(localId: string) {
-        const customData = await this.readUserCustom(localId);
+        const customData = await this.userCustom.get(localId);
 
         const { githubToken } = await this.request!.json() as { githubToken: string };
         if (!githubToken) throw HttpError.createBadRequest("githubToken is required");
 
         customData.githubTokenEncoded = await encrypt(githubToken, this.env.SECRET_KEY);
 
-        await this.writeUserCustom(localId, customData);
+        await this.userCustom.put(localId, customData);
         await logInfo(this.request!, this.env, "portal", `set github token to ${localId}`);
 
         return createJsonResponse({ success: true });
     }
 
     private async deleteGitHubToken(localId: string) {
-        const customData = await this.readUserCustom(localId);
+        const customData = await this.userCustom.get(localId);
 
         delete customData.githubTokenEncoded;
 
-        await this.writeUserCustom(localId, customData);
+        await this.userCustom.put(localId, customData);
         await logInfo(this.request!, this.env, "portal", `delete github token from ${localId}`);
 
         return createJsonResponse({ success: true });

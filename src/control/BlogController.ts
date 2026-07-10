@@ -1,5 +1,6 @@
 import { CustomHttpError } from "../util/CustomHttpError";
 import { HttpError } from "../util/HttpError";
+import { Permission } from "../util/permission";
 import { b64ToStr, createFrontMatter, createJsonResponse, logInfo, parseFrontMatter } from "../util/utils";
 import { IController } from "./IController";
 
@@ -128,8 +129,8 @@ export class BlogController extends IController {
         if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
 
-        const data = await this.checkAuthAndPermission();
-        
+        const { user: data } = await this.checkAuthAndPermission(Permission.BlogEdit);
+
         await this.github.useUserGitHubToken(this.env, data.localId);
 
         const page = this.request.headers.get("page");
@@ -280,9 +281,9 @@ export class BlogController extends IController {
     public async updatePostV1() {
         if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-        
-        const data = await this.checkAuthAndPermission();
-        
+
+        const { user: data } = await this.checkAuthAndPermission(Permission.BlogEdit);
+
         await this.github.useUserGitHubToken(this.env, data.localId);
 
         const page = this.request.headers.get("page");
@@ -303,9 +304,9 @@ export class BlogController extends IController {
     public async updateStaticPageV1() {
         if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-        
-        const data = await this.checkAuthAndPermission();
-        
+
+        const { user: data } = await this.checkAuthAndPermission(Permission.PageEdit);
+
         await this.github.useUserGitHubToken(this.env, data.localId);
 
         const page = this.request.headers.get("page");
@@ -326,8 +327,8 @@ export class BlogController extends IController {
     public async deletePost() {
         if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-        const data = await this.checkAuthAndPermission();
-        
+        const { user: data } = await this.checkAuthAndPermission(Permission.BlogEdit);
+
         await this.github.useUserGitHubToken(this.env, data.localId);
         const page = this.request.headers.get("page");
         if (!page) throw HttpError.createBadRequest("page header is required");
@@ -347,7 +348,7 @@ export class BlogController extends IController {
     public async deleteStaticPage() {
         if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-        const data = await this.checkAuthAndPermission();
+        const { user: data } = await this.checkAuthAndPermission(Permission.PageEdit);
         await this.github.useUserGitHubToken(this.env, data.localId);
         const page = this.request.headers.get("page");
         if (!page) throw HttpError.createBadRequest("page header is required");

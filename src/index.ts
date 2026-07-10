@@ -8,7 +8,7 @@ import { InviteController } from "./control/InviteController";
 import { BlogController } from "./control/BlogController";
 import { PortalController } from "./control/PortalController";
 import { PingController } from "./control/PingController";
-import { MembersGSheetsService } from "./util/service/members-gs";
+import { MemberRepository } from "./util/service/members-d1";
 import { ImageController } from "./control/ImageController";
 import { SwitchBotService } from "./util/service/swbot";
 import { SwitchBotController } from "./control/SwitchBotController";
@@ -67,17 +67,17 @@ export default {
 		try {
 			// if (!env.GITHUB_TOKEN) throw new HttpError(500, "INTERNAL_SERVER_ERROR", "GITHUB_TOKEN is not set");
 			if (!env.FIREBASE_API_KEY) throw new HttpError(500, "INTERNAL_SERVER_ERROR", "FIREBASE_API_KEY is not set");
-			if (!env.MEMBERS_SPREADSHEET_ID) throw new HttpError(500, "INTERNAL_SERVER_ERROR", "MEMBERS_SPREADSHEET_ID is not set");
+			if (!env.DB) throw new HttpError(500, "INTERNAL_SERVER_ERROR", "DB is not bound");
 
 			const github = new GitHubService(env.GITHUB_TOKEN);
 			const firebase = new FirebaseService(env.FIREBASE_API_KEY);
-			const members_googlesheets = new MembersGSheetsService(env.GOOGLE_SA_KEY, env.MEMBERS_SPREADSHEET_ID, ctx, env);
+			const members = new MemberRepository(env.DB);
 			const switchbot = new SwitchBotService(env.SWBOT_TOKEN, env.SWBOT_CLIENT_SECRET);
 			
 			if (pathname === "/") return new Response("Welcome to osu-denken web-api!", { status: 200 });
 
 			if (controller) {
-				controller.setServices(firebase, github, members_googlesheets, switchbot);
+				controller.setServices(firebase, github, members, switchbot);
 				controller.setRequest(request);
 				controller.setAuthorization(authorization);
 				controller.setEnv(env);

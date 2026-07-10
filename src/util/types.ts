@@ -6,20 +6,21 @@ export interface Env {
 	DISCORD_INVITE: string;
 	REGISTER_PASSPHRASE: string;
 	GOOGLE_DRIVE_TOKEN: string;
-	GOOGLE_SA_KEY: string;
 	SECRET_KEY: string;
 	SWBOT_TOKEN: string;
 	SWBOT_CLIENT_SECRET: string;
 
-	MEMBERS_SPREADSHEET_ID: string;
+	ALLOWED_EMAIL_DOMAIN: string;
 
 	// Key-Value
     BLOG_META: KVNamespace;
 	INVITE_CODE: KVNamespace;
 	LOGS: KVNamespace;
-	MEMBERS: KVNamespace;
 	CACHE: KVNamespace;
 	USER_CUSTOM: KVNamespace;
+
+	// D1
+	DB: D1Database;
 }
 
 export interface SwitchBotResponse {
