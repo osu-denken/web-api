@@ -50,6 +50,17 @@ export class MemberRepository {
     }
 
     /**
+     * IDで引く。居なければ 404
+     * @param id 部員ID
+     */
+    public async requireById(id: number): Promise<Member> {
+        const row = await this.db.prepare(`${SELECT_ALL} WHERE id = ?`).bind(id).first<MemberRow>();
+        if (!row) throw HttpError.createNotFound(`Member #${id} not found`);
+
+        return toMember(row);
+    }
+
+    /**
      * メールアドレスで引く
      * @param email 大学付与のメールアドレス
      */

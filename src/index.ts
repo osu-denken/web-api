@@ -9,6 +9,7 @@ import { BlogController } from "./control/BlogController";
 import { PortalController } from "./control/PortalController";
 import { PingController } from "./control/PingController";
 import { MemberRepository } from "./util/service/members-d1";
+import { MemberController } from "./control/MemberController";
 import { ImageController } from "./control/ImageController";
 import { SwitchBotService } from "./util/service/swbot";
 import { SwitchBotController } from "./control/SwitchBotController";
@@ -25,6 +26,8 @@ const routes: Record<string, ControllerFactory> = {
   "discord": (path) => new PortalController(path),
   "github": (path) => new PortalController(path),
   "switchbot": (path) => new SwitchBotController(path),
+  "members": (path) => new MemberController(path),
+  "v1/members": (path) => new MemberController(path),
   "v1/ping" : (path) => new PingController(path),
   "v1/user": (path) => new UserController(path),
   "v1/blog": (path) => new BlogController(path),
