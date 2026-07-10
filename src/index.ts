@@ -13,6 +13,7 @@ import { MemberController } from "./control/MemberController";
 import { ImageController } from "./control/ImageController";
 import { SwitchBotService } from "./util/service/swbot";
 import { SwitchBotController } from "./control/SwitchBotController";
+import { TerminalController } from "./control/TerminalController";
 
 type ControllerFactory = (path: string[]) => IController;
 
@@ -27,6 +28,8 @@ const routes: Record<string, ControllerFactory> = {
   "github": (path) => new PortalController(path),
   "switchbot": (path) => new SwitchBotController(path),
   "members": (path) => new MemberController(path),
+  "terminal": (path) => new TerminalController(path),
+  "v1/terminal": (path) => new TerminalController(path),
   "v1/ping" : (path) => new PingController(path),
   "v1/user": (path) => new UserController(path),
   "v1/blog": (path) => new BlogController(path),
