@@ -1,3 +1,4 @@
+import { HttpError } from "./HttpError";
 import { MEMBER_DEFAULT_PERMISSIONS, Permission, Role, resolvePermissions } from "./permission";
 
 /**
@@ -60,6 +61,31 @@ export function normalizeStudentId(studentId: string): string {
         : trimmed;
 
     return withoutPrefix.toUpperCase();
+}
+
+/** 学籍番号の書式。s + 入学年度2桁 + 学部1文字 + 連番3桁 (例: s24h034) */
+const STUDENT_ID_PATTERN = /^s\d{2}[a-z]\d{3}$/;
+
+/**
+ * 大学付与のメールアドレスを正規化する。
+ * 学籍番号の書式に直せるものは直し、直せないものは弾く。
+ * @param input 入力されたメールアドレスまたは学籍番号
+ * @param domain 許可するドメイン
+ */
+export function normalizeStudentEmail(input: string, domain: string): string {
+    const trimmed = input.trim().toLowerCase().replace(/\s/g, "");
+    const [rawLocal, rawDomain] = trimmed.includes("@") ? trimmed.split("@") : [trimmed, domain];
+
+    if (rawDomain !== domain)
+        throw HttpError.createBadRequest(`Email must be from ${domain} domain`);
+
+    // 先頭の s を落とした形で来ることがあるので補う
+    const local = STUDENT_ID_PATTERN.test(rawLocal) ? rawLocal : `s${rawLocal}`;
+
+    if (!STUDENT_ID_PATTERN.test(local))
+        throw HttpError.createBadRequest("Email must be a student ID like s24h034");
+
+    return `${local}@${domain}`;
 }
 
 /**
