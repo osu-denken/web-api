@@ -9,6 +9,7 @@ Cloudflare Workers上で稼働しています。
 - **User API**: Firebase Authenticationを用いたユーザー認証、管理 (大産大のドメインを持つメールアドレスのみ登録可能)
 - **Invite API**: 新規ユーザー登録のための招待コード作成、管理
 - **Portal API**: 部員向けポータルサイト用の情報集約、および外部サービス (GitHub, Discord) への招待機能
+- **Member API**: 部員管理
 
 ## セットアップ
 
