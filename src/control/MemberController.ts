@@ -1,9 +1,10 @@
 import { HttpError } from "../util/HttpError";
 import { Member, MemberStatus, normalizeStudentEmail, normalizeStudentId, toAdminMember } from "../util/member";
-import { hasPermission, normalizeRoles, Permission, Role } from "../util/permission";
-import { MemberPatch, MemberRepository } from "../util/service/members-d1";
+import { MemberUpdateService, UpdateBody } from "../util/member-update";
+import { normalizeRoles, Permission, Role } from "../util/permission";
+import { MemberRepository } from "../util/service/members-d1";
 import { createJsonResponse, logInfo } from "../util/utils";
-import { AuthContext, IController } from "./IController";
+import { IController } from "./IController";
 
 /** 仮登録の申請本文。電話番号は任意 (本人があとで、または承認後に幹部が入れる) */
 interface RegisterBody {
@@ -13,28 +14,8 @@ interface RegisterBody {
     birthday?: string | null;
 }
 
-interface UpdateBody {
-    id?: number;
-    name?: string;
-    furigana?: string | null;
-    email?: string;
-    tel?: string | null;
-    roleBits?: number;
-    permBits?: number;
-    status?: MemberStatus;
-    joinDate?: string | null;
-    leaveDate?: string | null;
-}
-
-/** 承認・却下を経ずに直接切り替えてよい在籍状態 */
-const EDITABLE_STATUSES: MemberStatus[] = ["active", "withdrawn", "graduated"];
-
 /** 電話番号の閲覧・編集は幹部に限る */
 const isExecutive = (member: Member) => Boolean(normalizeRoles(member.roleBits) & Role.Executive);
-
-/** 役職ビットと権限ビットの上限。未知のビットは受け付けない */
-const ALL_ROLE_BITS = Object.values(Role).reduce<number>((a, b) => typeof b === "number" ? a | b : a, 0);
-const ALL_PERMISSION_BITS = Object.values(Permission).reduce<number>((a, b) => typeof b === "number" ? a | b : a, 0);
 
 /**
  * 部員管理画面向け。名簿の全項目を返すため MemberManage 以上を要求する。
@@ -218,7 +199,8 @@ export class MemberController extends IController {
         if (typeof body.id !== "number") throw HttpError.createBadRequest("id is required");
 
         const target = await this.repository.requireById(body.id);
-        const patch = this.buildPatch(body, target, auth);
+        const updater = new MemberUpdateService(this.env.ALLOWED_EMAIL_DOMAIN);
+        const patch = updater.buildPatch(body, target, auth);
 
         try {
             await this.repository.update(target.id, patch);
@@ -232,78 +214,5 @@ export class MemberController extends IController {
             `Update member #${target.id} (${Object.keys(patch).join(",")}) by #${auth.member.id}`);
 
         return createJsonResponse({ success: true });
-    }
-
-    /**
-     * 変更のあった項目だけを取り出し、それぞれに必要な権限を検査する
-     * @param body リクエスト本文
-     * @param target 更新対象
-     * @param auth 操作する側
-     */
-    private buildPatch(body: UpdateBody, target: Member, auth: AuthContext): MemberPatch {
-        const patch: MemberPatch = {};
-
-        if (body.name !== undefined && body.name !== target.name) {
-            if (!body.name.trim()) throw HttpError.createBadRequest("name must not be empty");
-            patch.name = body.name.trim();
-        }
-
-        if (body.furigana !== undefined && body.furigana !== target.furigana)
-            patch.furigana = body.furigana || null;
-
-        if (body.email !== undefined && body.email.toLowerCase() !== target.email)
-            patch.email = normalizeStudentEmail(body.email, this.env.ALLOWED_EMAIL_DOMAIN);
-
-        if (body.joinDate !== undefined && body.joinDate !== target.joinDate)
-            patch.joinDate = body.joinDate || null;
-
-        // 電話番号は幹部しか閲覧できないので、編集も幹部に限る
-        if (body.tel !== undefined && body.tel !== target.tel) {
-            if (!isExecutive(auth.member)) throw HttpError.createForbidden("Only executives can edit tel");
-            patch.tel = body.tel || null;
-        }
-
-        if (body.roleBits !== undefined && body.roleBits !== target.roleBits) {
-            this.require(auth, Permission.MemberRoleEdit);
-            if (body.roleBits & ~ALL_ROLE_BITS) throw HttpError.createBadRequest("Unknown role bits");
-            patch.roleBits = body.roleBits as Role;
-        }
-
-        if (body.permBits !== undefined && body.permBits !== target.permBits) {
-            this.require(auth, Permission.MemberPermissionEdit);
-            if (body.permBits & ~ALL_PERMISSION_BITS) throw HttpError.createBadRequest("Unknown permission bits");
-            patch.permBits = body.permBits as Permission;
-        }
-
-        if (body.status !== undefined && body.status !== target.status)
-            Object.assign(patch, this.statusPatch(body, target, auth));
-
-        return patch;
-    }
-
-    /**
-     * 在籍状態の変更。承認・却下は専用のエンドポイントに任せる
-     */
-    private statusPatch(body: UpdateBody, target: Member, auth: AuthContext): MemberPatch {
-        this.require(auth, Permission.MemberDelete);
-
-        if (!EDITABLE_STATUSES.includes(body.status!))
-            throw HttpError.createBadRequest("status must be active, withdrawn or graduated");
-
-        // 自分自身を在籍から外すと権限を失って復帰できなくなる
-        if (target.id === auth.member.id)
-            throw HttpError.createBadRequest("Cannot change your own status");
-
-        if (body.status === "active") return { status: "active", leaveDate: null };
-
-        return {
-            status: body.status,
-            leaveDate: body.leaveDate || new Date().toISOString().slice(0, 10)
-        };
-    }
-
-    private require(auth: AuthContext, required: Permission) {
-        if (!hasPermission(auth.permissions, required))
-            throw HttpError.createForbidden("You are not have permissions");
     }
 }
