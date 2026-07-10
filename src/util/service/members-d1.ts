@@ -7,10 +7,12 @@ type LeftStatus = Extract<MemberStatus, "withdrawn" | "graduated">;
 export interface MemberPatch {
     name?: string;
     furigana?: string | null;
+    email?: string;
     tel?: string | null;
     roleBits?: Role;
     permBits?: Permission;
     status?: MemberStatus;
+    joinDate?: string | null;
     leaveDate?: string | null;
 }
 import { Permission, Role } from "../permission";
@@ -78,6 +80,18 @@ export class MemberRepository {
     public async findByEmail(email: string): Promise<Member | null> {
         const row = await this.db.prepare(`${SELECT_ALL} WHERE email = ?`)
             .bind(email.toLowerCase())
+            .first<MemberRow>();
+
+        return row ? toMember(row) : null;
+    }
+
+    /**
+     * Firebase のアカウントで引く。メールアドレス変更に影響されない
+     * @param localId Firebase Local ID
+     */
+    public async findByLocalId(localId: string): Promise<Member | null> {
+        const row = await this.db.prepare(`${SELECT_ALL} WHERE local_id = ?`)
+            .bind(localId)
             .first<MemberRow>();
 
         return row ? toMember(row) : null;
@@ -169,10 +183,12 @@ export class MemberRepository {
         const columns: [keyof MemberPatch, string][] = [
             ["name", "name"],
             ["furigana", "furigana"],
+            ["email", "email"],
             ["tel", "tel"],
             ["roleBits", "role_bits"],
             ["permBits", "perm_bits"],
             ["status", "status"],
+            ["joinDate", "join_date"],
             ["leaveDate", "leave_date"],
         ];
 

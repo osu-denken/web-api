@@ -103,7 +103,9 @@ export abstract class IController {
         if (!user.email.endsWith(this.env.ALLOWED_EMAIL_DOMAIN))
             throw HttpError.createBadRequest(`Email must be from ${this.env.ALLOWED_EMAIL_DOMAIN} domain`);
 
-        const member = await this.members.requireByEmail(user.email);
+        // 紐づけ済みなら local_id で引く。名簿側のメールアドレスを変えても追随できる
+        const member = await this.members.findByLocalId(user.localId)
+            ?? await this.members.requireByEmail(user.email);
 
         // 初回認証時に Firebase アカウントと名簿を紐づける
         if (!member.localId) await this.members.linkLocalId(member.id, user.localId);

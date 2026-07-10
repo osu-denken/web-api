@@ -9,10 +9,12 @@ interface UpdateBody {
     id?: number;
     name?: string;
     furigana?: string | null;
+    email?: string;
     tel?: string | null;
     roleBits?: number;
     permBits?: number;
     status?: MemberStatus;
+    joinDate?: string | null;
     leaveDate?: string | null;
 }
 
@@ -156,7 +158,14 @@ export class MemberController extends IController {
         const target = await this.repository.requireById(body.id);
         const patch = this.buildPatch(body, target, auth);
 
-        await this.repository.update(target.id, patch);
+        try {
+            await this.repository.update(target.id, patch);
+        } catch (e: any) {
+            // email は UNIQUE。他の部員と衝突したら利用者に伝わる形で返す
+            if (String(e?.message).includes("UNIQUE")) throw HttpError.createBadRequest("Email is already used");
+            throw e;
+        }
+
         await logInfo(this.request!, this.env, "member_update",
             `Update member #${target.id} (${Object.keys(patch).join(",")}) by #${auth.member.id}`);
 
@@ -179,6 +188,12 @@ export class MemberController extends IController {
 
         if (body.furigana !== undefined && body.furigana !== target.furigana)
             patch.furigana = body.furigana || null;
+
+        if (body.email !== undefined && body.email.toLowerCase() !== target.email)
+            patch.email = this.validateEmail(body.email);
+
+        if (body.joinDate !== undefined && body.joinDate !== target.joinDate)
+            patch.joinDate = body.joinDate || null;
 
         // 電話番号は幹部しか閲覧できないので、編集も幹部に限る
         if (body.tel !== undefined && body.tel !== target.tel) {
@@ -223,6 +238,19 @@ export class MemberController extends IController {
             status: body.status,
             leaveDate: body.leaveDate || new Date().toISOString().slice(0, 10)
         };
+    }
+
+    /**
+     * 大学のドメインのメールアドレスのみを許す
+     * @param email 入力されたメールアドレス
+     */
+    private validateEmail(email: string): string {
+        const normalized = email.trim().toLowerCase();
+
+        if (!normalized.endsWith(this.env.ALLOWED_EMAIL_DOMAIN))
+            throw HttpError.createBadRequest(`Email must be from ${this.env.ALLOWED_EMAIL_DOMAIN} domain`);
+
+        return normalized;
     }
 
     private require(auth: AuthContext, required: Permission) {
