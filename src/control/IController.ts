@@ -1,5 +1,5 @@
 import { HttpError } from "../util/HttpError";
-import { FirebaseService } from "../util/service/firebase";
+import { FirebaseService, FirebaseUser } from "../util/service/firebase";
 import { GitHubService } from "../util/service/github";
 import { MembersGSheetsService } from "../util/service/members-gs";
 import { SwitchBotService } from "../util/service/swbot";
@@ -29,10 +29,6 @@ export abstract class IController {
      */
     public abstract route() : Promise<any> | any;
     
-    private async isJsonBody(body: unknown) {
-        return body !== null && typeof body === "object";
-    }
-
     public async toResponse() {
         const res = await this.route();
         if (res instanceof Response)
@@ -101,24 +97,21 @@ export abstract class IController {
      * 認証と権限をチェックする
      * @returns 認証データ
      */
-    protected async checkAuthAndPermission() {
-        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
+    protected async checkAuthAndPermission(): Promise<FirebaseUser> {
+        const user = await this.checkAuth();
+        await this.checkPermissionByEmail(user.email);
 
-        const data: any = await this.firebase?.verifyIdToken(this.authorization);
-        await this.checkPermissionByEmail(data.email);
-
-        return data;
+        return user;
     }
 
     /**
      * 認証チェックをする
      * @returns 認証データ
      */
-    protected async checkAuth() {
+    protected async checkAuth(): Promise<FirebaseUser> {
         if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
+        if (!this.firebase) throw HttpError.createInternalServerError("Firebase service not initialized");
 
-        const data: any = await this.firebase?.verifyIdToken(this.authorization);
-
-        return data;
+        return await this.firebase.verifyIdToken(this.authorization);
     }
 }

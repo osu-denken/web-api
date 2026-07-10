@@ -26,12 +26,10 @@ export class InviteController extends IController {
         const { code } = await this.request.json() as { code: string };
         if (!code) throw HttpError.createBadRequest("Code is required");
         
+        // 発行者の localId は未認証で叩けるこのエンドポイントから返してはならない
         const localId = await this.env.INVITE_CODE.get(code);
 
-        if (!localId)
-            return createJsonResponse({ valid: false });
-        
-        return createJsonResponse({ valid: true, localId });
+        return createJsonResponse({ valid: Boolean(localId) });
     }
 
     public async create() {

@@ -89,17 +89,12 @@ export default {
 			throw new HttpError(404, "NOT_FOUND", "Endpoint not found");
 
 		} catch (e: any) {
-			if (e instanceof HttpError) {
-				return e.toResponse();
-			}
-			
-			return new HttpError(500, "INTERNAL_SERVER_ERROR", 
-				JSON.stringify({
-					name: e?.name,
-					message: e?.message,
-					stack: e?.stack,
-				}, null, 2)
-			).toResponse();
+			if (e instanceof HttpError) return e.toResponse();
+
+			// スタックトレースは内部構造を晒すため、レスポンスには載せずログにのみ残す
+			console.error("Unhandled error:", e?.name, e?.message, e?.stack);
+
+			return HttpError.createInternalServerError().toResponse();
 		}
 	}
 } satisfies ExportedHandler<Env>;

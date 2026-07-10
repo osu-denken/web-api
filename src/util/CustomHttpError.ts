@@ -18,6 +18,12 @@ export class CustomHttpError extends HttpError {
     }    
     
     public toResponse() {
+        // 5xx の data には外部APIの生レスポンスが入りうるので、クライアントには返さない
+        if (this.status >= 500) {
+            console.error("CustomHttpError:", this.error, this.message, this.data);
+            return super.toResponse();
+        }
+
         return createJsonResponse({
             status: this.status,
             error: this.error,

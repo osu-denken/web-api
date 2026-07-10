@@ -2,6 +2,30 @@ import { HttpError } from "../HttpError";
 
 const BASE_URL = "https://identitytoolkit.googleapis.com/v1/accounts";
 
+export interface FirebaseUser {
+    localId: string;
+    email?: string;
+    displayName?: string;
+    emailVerified?: boolean;
+    createdAt?: string;
+    lastLoginAt?: string;
+}
+
+/**
+ * accounts:lookup の生レスポンスには passwordHash と salt が含まれるため、
+ * クライアントへ渡ってよいフィールドだけを写し取る。
+ */
+function toFirebaseUser(raw: any): FirebaseUser {
+    return {
+        localId: raw.localId,
+        email: raw.email,
+        displayName: raw.displayName,
+        emailVerified: raw.emailVerified,
+        createdAt: raw.createdAt,
+        lastLoginAt: raw.lastLoginAt
+    };
+}
+
 export class FirebaseService {
     private apiKey: string;
 
@@ -61,21 +85,18 @@ export class FirebaseService {
         return await res.json();
     }
 
-    async verifyIdToken(idToken: string) {
+    async verifyIdToken(idToken: string): Promise<FirebaseUser> {
         const res = await this.request("lookup", { idToken });
         const data: any = await res.json();
 
-        if (!res.ok || !data.users || data.users.length === 0) {
-            return data; // 無効
-        }
+        if (!res.ok || !data.users || data.users.length === 0) throw HttpError.createUnauthorizedInvalidToken();
 
-        let result = data.users[0];
+        const result = data.users[0];
 
         if (!result) throw HttpError.createUnauthorizedInvalidToken();
         if (result.disabled) throw HttpError.createForbidden("User account is disabled");
-        if (result.error && result.error.message === "INVALID_ID_TOKEN") throw HttpError.createUnauthorizedInvalidToken();
 
-        return result; // ユーザー情報
+        return toFirebaseUser(result);
     }
 
     async existUser(email: string): Promise<boolean> {

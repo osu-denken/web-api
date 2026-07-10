@@ -92,11 +92,7 @@ export class GitHubService {
      * @param path ファイルパス
      */
     public async getFileContent(path: string) {
-        try {
-            return this.request(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`, "GET");
-        } catch (e) {
-            return new CustomHttpError(500, "INTERNAL_SERVER_ERROR", "GitHub get file failed", e)
-        }
+        return this.request(`https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`, "GET");
     }
     
     /**
@@ -162,13 +158,7 @@ export class GitHubService {
         if (res.status === 404) 
             throw new HttpError(404, "NOT_FOUND", "Static page not found");
 
-        const page: any = await res.json();
-        
-        let source = page.content;
-        if (page.encoding && page.encoding === "base64")
-            source = b64ToStr(source);
-
-        return page;
+        return await res.json();
     }
 
     /**
@@ -207,11 +197,7 @@ export class GitHubService {
     public async updateStaticPage(slug: string, content: string, message: string = "Update static page via Cloudflare Worker", sha?: string) {
         await GitHubService.checkSafePath(slug, true);
 
-        try {
-            return this.uploadFile(`${slug}.md`, toBase64(content), message)
-        } catch (e) {
-            return Promise.reject(e);
-        }
+        return this.uploadFile(`${slug}.md`, toBase64(content), message, sha);
     }
 
     /**
@@ -225,11 +211,7 @@ export class GitHubService {
     public async updatePost(slug: string, content: string, message: string = "Update post via Cloudflare Worker", sha?: string) {
         await GitHubService.checkSafePath(slug);
 
-        try {
-            return this.uploadFile(`_posts/${slug}.md`, toBase64(content), message)
-        } catch (e) {
-            return Promise.reject(e);
-        }
+        return this.uploadFile(`_posts/${slug}.md`, toBase64(content), message, sha);
     }
     
     public async inviteOrganization(email: string) {

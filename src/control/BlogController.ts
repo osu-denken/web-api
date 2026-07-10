@@ -12,16 +12,10 @@ export class BlogController extends IController {
         super(path);
 
         if (path.length < 3) {
-            let tmp = path[1];
+            const action = path[1] ?? "list";
             path[0] = "v2";
             path[1] = "blog";
-            path[2] = tmp;
-        }
-
-        if (path.length < 2) {
-            path[0] = "v2";
-            path[1] = "blog";
-            path[2] = "list";
+            path[2] = action;
         }
     }
 
@@ -61,7 +55,7 @@ export class BlogController extends IController {
                 continue;
 
             post.name = post.name.replace(".md", "");
-            post.meta = await this.getMetaCached(post.name, post);
+            post.meta = await this.getMetaCached(post.name, post, slug => this.loadPostFile(slug));
         }
 
         return createJsonResponse(
@@ -89,7 +83,7 @@ export class BlogController extends IController {
                 continue;
             
             page.name = page.name.replace(".md", "");
-            page.meta = await this.getMetaStaticPageCached(page.name, page);
+            page.meta = await this.getMetaCached(page.name, page, slug => this.loadStaticPageFile(slug));
         }
 
         return createJsonResponse(
@@ -173,58 +167,48 @@ export class BlogController extends IController {
     }
 
     /**
-     * 記事ページのメタデータを取得する
+     * 記事ページのファイルを取得する
      * @param slug ページ名
-     * @param post 記事のデータ
-     * @returns メタデータ
+     * @returns GitHub Contents API のファイルデータ
      */
-    private async getMetaCached(slug: string, post?: any) {
-        const cacheKey = `meta:${slug}`;
-        const cachedStr = await this.env.BLOG_META.get(cacheKey);
-        const cached = cachedStr ? JSON.parse(cachedStr) : null;
-
-        if (!post || (post && !post.content)) {
-            const res: any = await this.github!.getPostRaw(`${slug}.md`);
-            post = await res.json();
-            if (!post.content) return {};
-        }
-        const sha = post.sha;
-        if (cached?.sha === sha) return cached.meta;
-
-        let content = post.content;
-        if (post.encoding === "base64") 
-            content = b64ToStr(content);
-
-        if (!content) throw new CustomHttpError(404, "NOT_FOUND", "Post content not found", post);
-        const meta = parseFrontMatter(content).meta || {};
-        await this.env.BLOG_META.put(cacheKey, JSON.stringify({ sha, meta }));
-
-        return meta;
+    private async loadPostFile(slug: string) {
+        const res: any = await this.github!.getPostRaw(`${slug}.md`);
+        return await res.json();
     }
 
     /**
-     * 固定ページのメタデータを取得する
+     * 固定ページのファイルを取得する
      * @param slug ページ名
-     * @param page 固定のデータ
+     * @returns GitHub Contents API のファイルデータ
+     */
+    private async loadStaticPageFile(slug: string) {
+        return await this.github!.getStaticPageRaw(`${slug}.md`);
+    }
+
+    /**
+     * メタデータを取得する
+     * @param slug ページ名
+     * @param entry 一覧から得たデータ (content を持たないことがある)
+     * @param load content を持つファイルデータを取り直す関数
      * @returns メタデータ
      */
-    private async getMetaStaticPageCached(slug: string, page?: any) {
+    private async getMetaCached(slug: string, entry: any, load: (slug: string) => Promise<any>) {
         const cacheKey = `meta:${slug}`;
         const cachedStr = await this.env.BLOG_META.get(cacheKey);
         const cached = cachedStr ? JSON.parse(cachedStr) : null;
 
-        if (!page || (page && !page.content)) {
-            const page: any = await this.github!.getStaticPageRaw(`${slug}.md`);
-            if (!page.content) return {};
-        }
-        const sha = page.sha;
+        let file = entry;
+        if (!file?.content) file = await load(slug);
+        if (!file?.content) return {};
+
+        const sha = file.sha;
         if (cached?.sha === sha) return cached.meta;
 
-        let content = page.content;
-        if (page.encoding === "base64") 
+        let content = file.content;
+        if (file.encoding === "base64")
             content = b64ToStr(content);
 
-        if (!content) throw new CustomHttpError(404, "NOT_FOUND", "Page content not found", page);
+        if (!content) throw new CustomHttpError(404, "NOT_FOUND", "Content not found", file);
         const meta = parseFrontMatter(content).meta || {};
         await this.env.BLOG_META.put(cacheKey, JSON.stringify({ sha, meta }));
 

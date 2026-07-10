@@ -1,5 +1,5 @@
 import { HttpError } from "../util/HttpError";
-import { createJsonResponse, logInfo } from "../util/utils";
+import { createJsonResponse, logInfo, timingSafeEqual } from "../util/utils";
 import { IController } from "./IController";
 
 export class UserController extends IController {    
@@ -70,13 +70,15 @@ export class UserController extends IController {
 
         let { email, password, passphrase } = await this.request.json() as { email: string; password: string, passphrase: string };
 
-        if (passphrase !== this.env.REGISTER_PASSPHRASE) {
+        const isMasterPassphrase = timingSafeEqual(passphrase ?? "", this.env.REGISTER_PASSPHRASE);
+
+        if (!isMasterPassphrase) {
             const localId = await this.env.INVITE_CODE.get(passphrase);
             if (!localId) {
                 throw new HttpError(403, "FORBIDDEN", "Invalid passphrase or invite code");
             }
         }
-        
+
         if (!email || !password) {
             throw new HttpError(400, "BAD_REQUEST", "email and password are required");
         }
@@ -85,11 +87,11 @@ export class UserController extends IController {
 
         const data: any = await this.firebase?.registerUser(email, password);
         data.success = true;
-        
-        if (passphrase !== this.env.REGISTER_PASSPHRASE) 
+
+        if (!isMasterPassphrase)
             await this.env.INVITE_CODE.delete(passphrase);
 
-        await logInfo(this.request, this.env, "register", `Register user "${email}" with code: ${passphrase === this.env.REGISTER_PASSPHRASE ? "REGISTER_PASSPHRASE" : passphrase}`);
+        await logInfo(this.request, this.env, "register", `Register user "${email}" with code: ${isMasterPassphrase ? "REGISTER_PASSPHRASE" : passphrase}`);
 
         return createJsonResponse(data);
     }
@@ -188,19 +190,9 @@ export class UserController extends IController {
      */
     public async info() {
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
 
-        const data: any = await this.firebase?.verifyIdToken(this.authorization);
-        
-        if (!data || (data.error && data.error.message === "INVALID_ID_TOKEN")) {
-            throw new HttpError(401, "UNAUTHORIZED", "Invalid idToken");
-        }
+        const user = await this.checkAuth();
 
-        if (data.disabled) {
-            throw new HttpError(403, "FORBIDDEN", "User account is disabled");
-        }
-        
-        data.success = true;
-        return createJsonResponse(data);
+        return createJsonResponse({ ...user, success: true });
     }
 }

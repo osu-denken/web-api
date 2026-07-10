@@ -1,4 +1,3 @@
-import { HttpError } from "./HttpError";
 import { Env } from "./types";
 
 const encoder = new TextEncoder();
@@ -176,26 +175,48 @@ export function sha256(data: string): Promise<string> {
 }
 
 /**
- * エラーのResponse作成
- * @param msg エラーメッセージ
- * @returns Response
- */
-export function die(msg: string = "Internal Server Error") {
-  return HttpError.createInternalServerError(msg);
-}
-
-/**
  * 招待コード生成
  * @param length コードの長さ
  * @returns 招待コード
  */
 export function generateInviteCode(length = 8): string {
     const chars = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789";
+
+    // 256 を chars.length で割り切れる最大値。これ以上の値を捨てることでモジュロバイアスを避ける
+    const limit = 256 - (256 % chars.length);
+
     let code = "";
-    for (let i = 0; i < length; i++)
-        code += chars[Math.floor(Math.random() * chars.length)];
-    
+    while (code.length < length) {
+        // 招待コードは登録の関門なので、予測可能な Math.random ではなく CSPRNG を使う
+        const bytes = crypto.getRandomValues(new Uint8Array(length));
+
+        for (const byte of bytes) {
+            if (byte >= limit) continue;
+            code += chars[byte % chars.length];
+            if (code.length === length) break;
+        }
+    }
+
     return code;
+}
+
+/**
+ * 秘密情報の比較 (タイミング攻撃対策)
+ * @param a 比較対象
+ * @param b 比較対象
+ * @returns 一致するかどうか
+ */
+export function timingSafeEqual(a: string, b: string): boolean {
+    const aBytes = encoder.encode(a);
+    const bBytes = encoder.encode(b);
+
+    if (aBytes.length !== bBytes.length) return false;
+
+    let diff = 0;
+    for (let i = 0; i < aBytes.length; i++)
+        diff |= aBytes[i] ^ bBytes[i];
+
+    return diff === 0;
 }
 
 /**

@@ -23,14 +23,7 @@ export class SwitchBotController extends IController {
     }
 
     public async validate() {
-        if (!this.switchbot) throw HttpError.createInternalServerError("SwitchBot service not initialized");
-
-        const data = await this.checkAuthAndPermission();
-
-        const res = await this.switchbot?.request("devices", "GET");
-        if (!res) throw HttpError.createInternalServerError("SwitchBotService is not initialized");
-
-        const json = await res.json() as SwitchBotResponse;
+        const json = await this.fetchDevices();
 
         if (json.statusCode === 100) {
             return createJsonResponse({ valid: true, success: true });
@@ -40,13 +33,7 @@ export class SwitchBotController extends IController {
     }
 
     public async list() {
-        if (!this.switchbot) throw HttpError.createInternalServerError("SwitchBot service not initialized");
-        
-        const data = await this.checkAuthAndPermission();
-
-        const res = await this.switchbot?.request("devices", "GET");
-        if (!res) throw HttpError.createInternalServerError("SwitchBotService is not initialized");
-        const json = await res.json() as SwitchBotResponse;
+        const json = await this.fetchDevices();
 
         if (json.statusCode === 100) {
             return createJsonResponse({ success: true, devices: json.body?.deviceList || [] });
@@ -56,58 +43,45 @@ export class SwitchBotController extends IController {
     }
 
     public async lock() {
-        if (!this.switchbot) throw HttpError.createInternalServerError("SwitchBot service not initialized");
-
-        const data = await this.checkAuthAndPermission();
-
-        const res = await this.switchbot?.request("devices", "GET");
-        if (!res) throw HttpError.createInternalServerError("SwitchBotService is not initialized");
-        const json = await res.json() as SwitchBotResponse;
-        if (json.statusCode === 100) {
-            const devices = json.body?.deviceList || [];
-            const lock = devices.find((d: any) => d.type === "Smart Lock");
-            if (!lock) throw HttpError.createNotFound("No Smart Lock device found");
-            const res2 = await this.switchbot?.request(`devices/${lock.deviceId}/commands`, "POST", {
-                commandType: "command",
-                command: "lock"
-            });
-            if (!res2) throw HttpError.createInternalServerError("Failed to send lock command");
-            const data2 = await res2.json() as SwitchBotResponse;
-            if (data2.statusCode === 100) {
-                return createJsonResponse({ success: true });
-            }
-        }
-        return createJsonResponse({ success: false, message: json.message });
+        return await this.sendLockCommand("lock");
     }
 
     public async unlock() {
+        return await this.sendLockCommand("unlock");
+    }
+
+    /**
+     * 認証・権限チェックのうえデバイス一覧を取得する
+     */
+    private async fetchDevices(): Promise<SwitchBotResponse> {
         if (!this.switchbot) throw HttpError.createInternalServerError("SwitchBot service not initialized");
-        
-        const data = await this.checkAuthAndPermission();
 
-        const res = await this.switchbot?.request("devices", "GET");
-        if (!res) throw HttpError.createInternalServerError("SwitchBotService is not initialized");
-        const json = await res.json() as SwitchBotResponse;
+        await this.checkAuthAndPermission();
 
-        if (json.statusCode === 100) {
-            const devices = json.body?.deviceList || [];
-            const lock = devices.find((d: any) => d.type === "Smart Lock");
-            if (!lock) throw HttpError.createNotFound("No Smart Lock device found");
+        const res = await this.switchbot.request("devices", "GET");
+        return await res.json() as SwitchBotResponse;
+    }
 
-            const res2 = await this.switchbot?.request(`devices/${lock.deviceId}/commands`, "POST", {
-                commandType: "command",
-                command: "unlock"
-            });
-            if (!res2) throw HttpError.createInternalServerError("Failed to send unlock command");
-        
-            const data2 = await res2.json() as SwitchBotResponse;
+    /**
+     * Smart Lock にコマンドを送る
+     * @param command lock または unlock
+     */
+    private async sendLockCommand(command: "lock" | "unlock") {
+        const json = await this.fetchDevices();
+        if (json.statusCode !== 100) return createJsonResponse({ success: false, message: json.message });
 
-            if (data2.statusCode === 100) {
-                return createJsonResponse({ success: true });
-            }
-            
-        }
+        const devices = json.body?.deviceList || [];
+        const lock = devices.find((d: any) => d.type === "Smart Lock");
+        if (!lock) throw HttpError.createNotFound("No Smart Lock device found");
 
-        return createJsonResponse({ success: false, message: json.message });
+        const res = await this.switchbot!.request(`devices/${lock.deviceId}/commands`, "POST", {
+            commandType: "command",
+            command
+        });
+
+        const result = await res.json() as SwitchBotResponse;
+        if (result.statusCode === 100) return createJsonResponse({ success: true });
+
+        return createJsonResponse({ success: false, message: result.message });
     }
 }
