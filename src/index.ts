@@ -27,7 +27,6 @@ const routes: Record<string, ControllerFactory> = {
   "github": (path) => new PortalController(path),
   "switchbot": (path) => new SwitchBotController(path),
   "members": (path) => new MemberController(path),
-  "v1/members": (path) => new MemberController(path),
   "v1/ping" : (path) => new PingController(path),
   "v1/user": (path) => new UserController(path),
   "v1/blog": (path) => new BlogController(path),
