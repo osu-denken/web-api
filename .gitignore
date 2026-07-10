@@ -1,3 +1,6 @@
+members.csv
+migrations/*_seed_members.sql
+
 # Logs
 
 logs
