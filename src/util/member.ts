@@ -1,4 +1,4 @@
-import { Permission, Role, resolvePermissions } from "./permission";
+import { MEMBER_DEFAULT_PERMISSIONS, Permission, Role, resolvePermissions } from "./permission";
 
 /**
  * 在籍状態。
@@ -53,13 +53,16 @@ export function normalizeStudentId(studentId: string): string {
 }
 
 /**
- * 実効権限。承認済みの部員でなければ一切の権限を持たない
+ * 実効権限。
+ * 卒業生は役職を退いているため、在籍時の役職によらず部員の標準権限に揃える。
+ * それ以外の在籍中でない状態 (仮登録・退部・却下) は一切の権限を持たない。
  * @param member 部員
  */
 export function effectivePermissions(member: Member): Permission {
-    if (member.status !== "active") return Permission.None;
+    if (member.status === "active") return resolvePermissions(member.roleBits, member.permBits);
+    if (member.status === "graduated") return MEMBER_DEFAULT_PERMISSIONS;
 
-    return resolvePermissions(member.roleBits, member.permBits);
+    return Permission.None;
 }
 
 /**

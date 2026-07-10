@@ -36,7 +36,7 @@
 		{
 			"binding": "DB",
 			"database_name": "osu-denken-members",
-			"database_id": "TODO: wrangler d1 create osu-denken-members で払い出した ID を入れる",
+			"database_id": "1c06c677-0c6b-4add-b3ac-8ddba782d852",
 			"migrations_dir": "migrations"
 		}
 	],
