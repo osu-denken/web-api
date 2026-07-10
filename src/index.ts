@@ -16,6 +16,7 @@ import { SwitchBotController } from "./control/SwitchBotController";
 import { TerminalController } from "./control/TerminalController";
 import { PrivatePostRepository } from "./util/service/private-posts-d1";
 import { PrivatePostController } from "./control/PrivatePostController";
+import { SitePageController } from "./control/SitePageController";
 
 type ControllerFactory = (path: string[]) => IController;
 
@@ -32,6 +33,7 @@ const routes: Record<string, ControllerFactory> = {
   "members": (path) => new MemberController(path),
   "terminal": (path) => new TerminalController(path),
   "private-posts": (path) => new PrivatePostController(path),
+  "site-pages": (path) => new SitePageController(path),
   "v1/terminal": (path) => new TerminalController(path),
   "v1/ping" : (path) => new PingController(path),
   "v1/user": (path) => new UserController(path),

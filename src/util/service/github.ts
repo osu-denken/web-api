@@ -17,6 +17,12 @@ const SITE_WORKFLOW = "deploy.yml";
 /** 管理画面から編集してよい fake terminal のファイル */
 const TERMINAL_EDITABLE_FILES = ["welcome.md", "welcome-log.md"];
 
+/**
+ * 管理画面から編集してよいサイト本体のファイル。
+ * 任意のパスを書けるようにするとリポジトリ全体を書き換えられるため、必ずここで固定する
+ */
+const SITE_EDITABLE_FILES = ["content/pages/about.md", "content/pages/access.md", "content/works.json"];
+
 export class GitHubService {
     private token: string;
 
@@ -313,6 +319,47 @@ export class GitHubService {
             throw new HttpError(400, "INVALID_SLUG", "Not an editable terminal file");
 
         return this.uploadFile(filename, toBase64(content), message, undefined, TERMINAL_REPO);
+    }
+
+    /**
+     * 管理画面から編集してよいサイト本体のファイルか
+     * @param path リポジトリのルートからのパス
+     */
+    public static isEditableSiteFile(path: string): boolean {
+        return SITE_EDITABLE_FILES.includes(path);
+    }
+
+    /** 編集してよいサイト本体のファイルの一覧 */
+    public static editableSiteFiles(): readonly string[] {
+        return SITE_EDITABLE_FILES;
+    }
+
+    /**
+     * サイト本体のファイルを取得する
+     * @param path リポジトリのルートからのパス
+     */
+    public async getSiteFile(path: string) {
+        if (!GitHubService.isEditableSiteFile(path))
+            throw new HttpError(400, "INVALID_SLUG", "Not an editable site file");
+
+        const res = await this.getFileContent(path, SITE_REPO);
+
+        if (res.status === 404) throw new HttpError(404, "NOT_FOUND", "Site file not found");
+
+        return res;
+    }
+
+    /**
+     * サイト本体のファイルを更新する
+     * @param path リポジトリのルートからのパス
+     * @param content ソース
+     * @param message コミットメッセージ
+     */
+    public async updateSiteFile(path: string, content: string, message: string = "Update site page via Cloudflare Worker") {
+        if (!GitHubService.isEditableSiteFile(path))
+            throw new HttpError(400, "INVALID_SLUG", "Not an editable site file");
+
+        return this.uploadFile(path, toBase64(content), message, undefined, SITE_REPO);
     }
 
     /**
