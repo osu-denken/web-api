@@ -14,6 +14,8 @@ import { ImageController } from "./control/ImageController";
 import { SwitchBotService } from "./util/service/swbot";
 import { SwitchBotController } from "./control/SwitchBotController";
 import { TerminalController } from "./control/TerminalController";
+import { PrivatePostRepository } from "./util/service/private-posts-d1";
+import { PrivatePostController } from "./control/PrivatePostController";
 
 type ControllerFactory = (path: string[]) => IController;
 
@@ -29,6 +31,7 @@ const routes: Record<string, ControllerFactory> = {
   "switchbot": (path) => new SwitchBotController(path),
   "members": (path) => new MemberController(path),
   "terminal": (path) => new TerminalController(path),
+  "private-posts": (path) => new PrivatePostController(path),
   "v1/terminal": (path) => new TerminalController(path),
   "v1/ping" : (path) => new PingController(path),
   "v1/user": (path) => new UserController(path),
@@ -78,11 +81,12 @@ export default {
 			const firebase = new FirebaseService(env.FIREBASE_API_KEY);
 			const members = new MemberRepository(env.DB);
 			const switchbot = new SwitchBotService(env.SWBOT_TOKEN, env.SWBOT_CLIENT_SECRET);
+			const privatePosts = new PrivatePostRepository(env.DB);
 			
 			if (pathname === "/") return new Response("Welcome to osu-denken web-api!", { status: 200 });
 
 			if (controller) {
-				controller.setServices(firebase, github, members, switchbot);
+				controller.setServices(firebase, github, members, switchbot, privatePosts);
 				controller.setRequest(request);
 				controller.setAuthorization(authorization);
 				controller.setEnv(env);

@@ -4,6 +4,7 @@ import { hasPermission, Permission } from "../util/permission";
 import { FirebaseService, FirebaseUser } from "../util/service/firebase";
 import { GitHubService } from "../util/service/github";
 import { MemberRepository } from "../util/service/members-d1";
+import { PrivatePostRepository } from "../util/service/private-posts-d1";
 import { SwitchBotService } from "../util/service/swbot";
 
 /**
@@ -21,6 +22,7 @@ export abstract class IController {
     public github: GitHubService | null = null;
     public members: MemberRepository | null = null;
     public switchbot: SwitchBotService | null = null;
+    public privatePosts: PrivatePostRepository | null = null;
 
     public request: Request | null = null;
     public authorization: string | null = null;
@@ -50,11 +52,12 @@ export abstract class IController {
         });
     }
 
-    public setServices(firebase: FirebaseService | null, github: GitHubService | null, members: MemberRepository | null, switchbot: SwitchBotService | null = null) {
+    public setServices(firebase: FirebaseService | null, github: GitHubService | null, members: MemberRepository | null, switchbot: SwitchBotService | null = null, privatePosts: PrivatePostRepository | null = null) {
         this.firebase = firebase;
         this.github = github;
         this.members = members;
         this.switchbot = switchbot;
+        this.privatePosts = privatePosts;
     }
 
     public setRequest(request: Request) {
