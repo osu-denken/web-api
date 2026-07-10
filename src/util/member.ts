@@ -34,6 +34,8 @@ export interface AdminMember extends PublicMember {
     email: string;
     permBits: Permission;
     approvedAt: string | null;
+    /** 電研ポータルのアカウントを作成済みか (Firebase と紐づいているか) */
+    hasAccount: boolean;
 }
 
 /** 名簿から外部へ返してよい項目 (部員内であっても取り扱いに注意) */
@@ -100,6 +102,7 @@ export function toAdminMember(member: Member): AdminMember {
         id: member.id,
         email: member.email,
         permBits: member.permBits,
-        approvedAt: member.approvedAt
+        approvedAt: member.approvedAt,
+        hasAccount: member.localId !== null
     };
 }

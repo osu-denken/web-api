@@ -1,9 +1,26 @@
 import { HttpError } from "../util/HttpError";
 import { Member, MemberStatus, toAdminMember } from "../util/member";
-import { normalizeRoles, Permission, Role } from "../util/permission";
-import { MemberRepository } from "../util/service/members-d1";
+import { hasPermission, normalizeRoles, Permission, Role } from "../util/permission";
+import { MemberPatch, MemberRepository } from "../util/service/members-d1";
 import { createJsonResponse, logInfo } from "../util/utils";
-import { IController } from "./IController";
+import { AuthContext, IController } from "./IController";
+
+interface UpdateBody {
+    id?: number;
+    name?: string;
+    furigana?: string | null;
+    tel?: string | null;
+    roleBits?: number;
+    permBits?: number;
+    status?: MemberStatus;
+    leaveDate?: string | null;
+}
+
+/** 承認・却下を経ずに直接切り替えてよい在籍状態 */
+const EDITABLE_STATUSES: MemberStatus[] = ["active", "withdrawn", "graduated"];
+
+/** 電話番号の閲覧・編集は幹部に限る */
+const isExecutive = (member: Member) => Boolean(normalizeRoles(member.roleBits) & Role.Executive);
 
 /** 役職ビットと権限ビットの上限。未知のビットは受け付けない */
 const ALL_ROLE_BITS = Object.values(Role).reduce<number>((a, b) => typeof b === "number" ? a | b : a, 0);
@@ -32,12 +49,8 @@ export class MemberController extends IController {
                 return this.approve();
             case "reject":
                 return this.reject();
-            case "roles":
-                return this.updateRoles();
-            case "permissions":
-                return this.updatePermissions();
-            case "leave":
-                return this.leave();
+            case "update":
+                return this.update();
         }
 
         throw HttpError.createNotFound("Endpoint not found");
@@ -86,15 +99,16 @@ export class MemberController extends IController {
         const target = await this.targetMember();
 
         // 電話番号は重大な個人情報。MemberManage を個人付与された非幹部には見せない
-        const isExecutive = Boolean(normalizeRoles(auth.member.roleBits) & Role.Executive);
+        const canSeeTel = isExecutive(auth.member);
 
         await logInfo(this.request!, this.env, "member_detail",
             `Read member #${target.id} (${target.studentId}) by #${auth.member.id}` +
-            `${isExecutive ? " with tel" : ""}`);
+            `${canSeeTel ? " with tel" : ""}`);
 
         return createJsonResponse({
             success: true,
-            member: isExecutive ? target : { ...target, tel: null }
+            member: canSeeTel ? target : { ...target, tel: null },
+            canEditTel: canSeeTel
         });
     }
 
@@ -131,62 +145,88 @@ export class MemberController extends IController {
     }
 
     /**
-     * 役職を変更する
+     * 変更のあった項目をまとめて更新する。項目ごとに必要な権限が異なる
      */
-    public async updateRoles() {
-        const auth = await this.checkAuthAndPermission(Permission.MemberRoleEdit);
+    public async update() {
+        const auth = await this.checkAuthAndPermission(Permission.MemberManage);
 
-        const { id, roleBits } = await this.body<{ id?: number; roleBits?: number }>();
-        if (typeof id !== "number" || typeof roleBits !== "number")
-            throw HttpError.createBadRequest("id and roleBits are required");
+        const body = await this.body<UpdateBody>();
+        if (typeof body.id !== "number") throw HttpError.createBadRequest("id is required");
 
-        if (roleBits & ~ALL_ROLE_BITS) throw HttpError.createBadRequest("Unknown role bits");
+        const target = await this.repository.requireById(body.id);
+        const patch = this.buildPatch(body, target, auth);
 
-        const target = await this.repository.requireById(id);
-        await this.repository.updateRoles(target.id, roleBits as Role);
-        await logInfo(this.request!, this.env, "member_roles", `Set roles ${roleBits} to #${target.id} by #${auth.member.id}`);
+        await this.repository.update(target.id, patch);
+        await logInfo(this.request!, this.env, "member_update",
+            `Update member #${target.id} (${Object.keys(patch).join(",")}) by #${auth.member.id}`);
 
         return createJsonResponse({ success: true });
     }
 
     /**
-     * 個人単位の追加権限を変更する
+     * 変更のあった項目だけを取り出し、それぞれに必要な権限を検査する
+     * @param body リクエスト本文
+     * @param target 更新対象
+     * @param auth 操作する側
      */
-    public async updatePermissions() {
-        const auth = await this.checkAuthAndPermission(Permission.MemberPermissionEdit);
+    private buildPatch(body: UpdateBody, target: Member, auth: AuthContext): MemberPatch {
+        const patch: MemberPatch = {};
 
-        const { id, permBits } = await this.body<{ id?: number; permBits?: number }>();
-        if (typeof id !== "number" || typeof permBits !== "number")
-            throw HttpError.createBadRequest("id and permBits are required");
+        if (body.name !== undefined && body.name !== target.name) {
+            if (!body.name.trim()) throw HttpError.createBadRequest("name must not be empty");
+            patch.name = body.name.trim();
+        }
 
-        if (permBits & ~ALL_PERMISSION_BITS) throw HttpError.createBadRequest("Unknown permission bits");
+        if (body.furigana !== undefined && body.furigana !== target.furigana)
+            patch.furigana = body.furigana || null;
 
-        const target = await this.repository.requireById(id);
-        await this.repository.updatePermissions(target.id, permBits as Permission);
-        await logInfo(this.request!, this.env, "member_permissions", `Set permissions ${permBits} to #${target.id} by #${auth.member.id}`);
+        // 電話番号は幹部しか閲覧できないので、編集も幹部に限る
+        if (body.tel !== undefined && body.tel !== target.tel) {
+            if (!isExecutive(auth.member)) throw HttpError.createForbidden("Only executives can edit tel");
+            patch.tel = body.tel || null;
+        }
 
-        return createJsonResponse({ success: true });
+        if (body.roleBits !== undefined && body.roleBits !== target.roleBits) {
+            this.require(auth, Permission.MemberRoleEdit);
+            if (body.roleBits & ~ALL_ROLE_BITS) throw HttpError.createBadRequest("Unknown role bits");
+            patch.roleBits = body.roleBits as Role;
+        }
+
+        if (body.permBits !== undefined && body.permBits !== target.permBits) {
+            this.require(auth, Permission.MemberPermissionEdit);
+            if (body.permBits & ~ALL_PERMISSION_BITS) throw HttpError.createBadRequest("Unknown permission bits");
+            patch.permBits = body.permBits as Permission;
+        }
+
+        if (body.status !== undefined && body.status !== target.status)
+            Object.assign(patch, this.statusPatch(body, target, auth));
+
+        return patch;
     }
 
     /**
-     * 退部・卒業にする
+     * 在籍状態の変更。承認・却下は専用のエンドポイントに任せる
      */
-    public async leave() {
-        const auth = await this.checkAuthAndPermission(Permission.MemberDelete);
+    private statusPatch(body: UpdateBody, target: Member, auth: AuthContext): MemberPatch {
+        this.require(auth, Permission.MemberDelete);
 
-        const { id, status, leaveDate } = await this.body<{ id?: number; status?: string; leaveDate?: string }>();
-        if (typeof id !== "number") throw HttpError.createBadRequest("id is required");
-        if (status !== "withdrawn" && status !== "graduated")
-            throw HttpError.createBadRequest("status must be withdrawn or graduated");
-
-        const target = await this.repository.requireById(id);
+        if (!EDITABLE_STATUSES.includes(body.status!))
+            throw HttpError.createBadRequest("status must be active, withdrawn or graduated");
 
         // 自分自身を在籍から外すと権限を失って復帰できなくなる
-        if (target.id === auth.member.id) throw HttpError.createBadRequest("Cannot leave yourself");
+        if (target.id === auth.member.id)
+            throw HttpError.createBadRequest("Cannot change your own status");
 
-        await this.repository.leave(target.id, status, leaveDate);
-        await logInfo(this.request!, this.env, "member_leave", `Set ${status} to #${target.id} by #${auth.member.id}`);
+        if (body.status === "active") return { status: "active", leaveDate: null };
 
-        return createJsonResponse({ success: true });
+        return {
+            status: body.status,
+            leaveDate: body.leaveDate || new Date().toISOString().slice(0, 10)
+        };
+    }
+
+    private require(auth: AuthContext, required: Permission) {
+        if (!hasPermission(auth.permissions, required))
+            throw HttpError.createForbidden("You are not have permissions");
     }
 }

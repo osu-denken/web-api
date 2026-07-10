@@ -2,6 +2,17 @@ import { HttpError } from "../HttpError";
 import { Member, MemberStatus, normalizeStudentId } from "../member";
 
 type LeftStatus = Extract<MemberStatus, "withdrawn" | "graduated">;
+
+/** 部員管理画面からまとめて更新できる項目 */
+export interface MemberPatch {
+    name?: string;
+    furigana?: string | null;
+    tel?: string | null;
+    roleBits?: Role;
+    permBits?: Permission;
+    status?: MemberStatus;
+    leaveDate?: string | null;
+}
 import { Permission, Role } from "../permission";
 
 interface MemberRow {
@@ -150,21 +161,35 @@ export class MemberRepository {
     }
 
     /**
-     * 役職を変更する
+     * 変更のあった項目だけをまとめて更新する
      * @param id 対象の部員ID
-     * @param roleBits 役職ビット
+     * @param patch 更新する項目
      */
-    public async updateRoles(id: number, roleBits: Role): Promise<void> {
-        await this.db.prepare(`UPDATE members SET role_bits = ? WHERE id = ?`).bind(roleBits, id).run();
-    }
+    public async update(id: number, patch: MemberPatch): Promise<void> {
+        const columns: [keyof MemberPatch, string][] = [
+            ["name", "name"],
+            ["furigana", "furigana"],
+            ["tel", "tel"],
+            ["roleBits", "role_bits"],
+            ["permBits", "perm_bits"],
+            ["status", "status"],
+            ["leaveDate", "leave_date"],
+        ];
 
-    /**
-     * 個人単位の追加権限を変更する
-     * @param id 対象の部員ID
-     * @param permBits 追加権限ビット
-     */
-    public async updatePermissions(id: number, permBits: Permission): Promise<void> {
-        await this.db.prepare(`UPDATE members SET perm_bits = ? WHERE id = ?`).bind(permBits, id).run();
+        const assignments: string[] = [];
+        const values: unknown[] = [];
+
+        for (const [key, column] of columns) {
+            if (patch[key] === undefined) continue;
+
+            assignments.push(`${column} = ?`);
+            values.push(patch[key]);
+        }
+
+        if (assignments.length === 0) return;
+
+        await this.db.prepare(`UPDATE members SET ${assignments.join(", ")} WHERE id = ?`)
+            .bind(...values, id).run();
     }
 
     /**
@@ -174,17 +199,6 @@ export class MemberRepository {
      */
     public async linkLocalId(id: number, localId: string): Promise<void> {
         await this.db.prepare(`UPDATE members SET local_id = ? WHERE id = ?`).bind(localId, id).run();
-    }
-
-    /**
-     * 在籍を終える (行は残す)
-     * @param id 対象の部員ID
-     * @param status withdrawn (退部) または graduated (卒業)
-     * @param leaveDate 退部日・卒業日 (ISO8601)
-     */
-    public async leave(id: number, status: LeftStatus, leaveDate: string = new Date().toISOString()): Promise<void> {
-        await this.db.prepare(`UPDATE members SET status = ?, leave_date = ? WHERE id = ?`)
-            .bind(status, leaveDate, id).run();
     }
 
     /**
