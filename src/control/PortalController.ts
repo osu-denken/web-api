@@ -57,7 +57,9 @@ export class PortalController extends IController {
             limits: {
                 discordInviteCode: this.env.DISCORD_INVITE,
             },
-            hasGitHubToken: Boolean(customData.githubTokenEncoded)
+            hasGitHubToken: Boolean(customData.githubTokenEncoded),
+            hasTotp: Boolean(customData.totp),
+            recoveryCodesLeft: customData.totp?.recoveryCodeHashes.length ?? 0
         });
     }
 
