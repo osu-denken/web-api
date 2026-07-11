@@ -104,14 +104,21 @@ export class ImageController extends IController {
     private async resolveUploadedAt(github: GitHubService, sha: string, filename: string): Promise<string | null> {
         const key = dateCacheKey(sha);
 
-        const cached = await this.env.CACHE.get(key);
-        if (cached) return cached;
+        // 日時の付与はあくまで補助情報。KV や commits API が落ちても
+        // 一覧そのものは返せるよう、ここで失敗を握りつぶして null にする
+        try {
+            const cached = await this.env.CACHE?.get(key);
+            if (cached) return cached;
 
-        const uploadedAt = await github.getImageCommitDate(filename);
-        // sha に対する内容は不変なので TTL なしで置く
-        if (uploadedAt) await this.env.CACHE.put(key, uploadedAt);
+            const uploadedAt = await github.getImageCommitDate(filename);
+            // sha に対する内容は不変なので TTL なしで置く
+            if (uploadedAt) await this.env.CACHE?.put(key, uploadedAt);
 
-        return uploadedAt;
+            return uploadedAt;
+        } catch (e) {
+            console.error(`Failed to resolve uploadedAt for ${filename}:`, e);
+            return null;
+        }
     }
 
     public async upload() {
