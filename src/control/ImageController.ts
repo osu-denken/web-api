@@ -2,7 +2,20 @@ import { CustomHttpError } from "../util/CustomHttpError";
 import { HttpError } from "../util/HttpError";
 import { Permission } from "../util/permission";
 import { toBase64, createJsonResponse, logInfo } from "../util/utils";
+import { GitHubService } from "../util/service/github";
+import { FirebaseUser } from "../util/service/firebase";
 import { IController } from "./IController";
+
+/** 受け付ける画像 MIME と、保存時に使う拡張子の対応 */
+const MIME_TO_EXT: Record<string, string> = {
+    "image/jpeg": "jpg",
+    "image/png": "png",
+    "image/webp": "webp",
+    "image/gif": "gif"
+};
+
+/** アップロード日時キャッシュのキー。sha は内容が変われば必ず変わるので恒久キー化できる */
+const dateCacheKey = (sha: string) => `img-date:${sha}`;
 
 export class ImageController extends IController {
     public static MAX_SIZE = 20 * 1024 * 1024; // 20MB
@@ -29,16 +42,35 @@ export class ImageController extends IController {
         throw HttpError.createNotFound("Endpoint not found");
     }
 
+    /** GitHub サービスが初期化済みであることを保証して返す */
+    private requireGitHub(): GitHubService {
+        if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
+        return this.github;
+    }
+
+    /**
+     * 更新系エンドポイント共通の前処理。
+     * POST 検証・権限チェックを行い、ユーザーの GitHub トークンに切り替える。
+     * @returns 認証済みユーザー
+     */
+    private async authorizeMutation(github: GitHubService): Promise<FirebaseUser> {
+        if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
+
+        const { user } = await this.checkAuthAndPermission(Permission.BlogEdit);
+        await github.useUserGitHubToken(this.env, user.localId);
+
+        return user;
+    }
+
     /**
      * images/ 配下の画像を一覧する
      * @returns JsonResponse
      */
     public async list() {
-        if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
-
+        const github = this.requireGitHub();
         await this.checkAuthAndPermission(Permission.BlogEdit);
 
-        const res = await this.github.getImageList();
+        const res = await github.getImageList();
         if (!res.ok) throw new CustomHttpError(500, "INTERNAL_SERVER_ERROR", "GitHub list failed", await res.text());
 
         const entries: any[] = await res.json();
@@ -54,65 +86,62 @@ export class ImageController extends IController {
 
         // アップロード日時を付与する。sha は内容が変われば必ず変わるので、
         // sha ごとにコミット日時を KV へ恒久キャッシュして commits API の呼び出しを抑える
-        const withDates = await Promise.all(images.map(async img => {
-            const uploadedAt = await this.resolveUploadedAt(img.sha, img.name);
-            return { ...img, uploadedAt };
-        }));
+        const withDates = await Promise.all(images.map(async img => ({
+            ...img,
+            uploadedAt: await this.resolveUploadedAt(github, img.sha, img.name)
+        })));
 
         return createJsonResponse(withDates);
     }
 
     /**
      * 画像のアップロード日時を KV キャッシュ経由で解決する
+     * @param github GitHub サービス
      * @param sha GitHub 上の blob SHA (キャッシュキー)
      * @param filename images/ 配下のファイル名
      * @returns ISO8601 文字列、取得できなければ null
      */
-    private async resolveUploadedAt(sha: string, filename: string): Promise<string | null> {
-        const cacheKey = `img-date:${sha}`;
+    private async resolveUploadedAt(github: GitHubService, sha: string, filename: string): Promise<string | null> {
+        const key = dateCacheKey(sha);
 
-        const cached = await this.env.CACHE.get(cacheKey);
+        const cached = await this.env.CACHE.get(key);
         if (cached) return cached;
 
-        const uploadedAt = await this.github!.getImageCommitDate(filename);
+        const uploadedAt = await github.getImageCommitDate(filename);
         // sha に対する内容は不変なので TTL なしで置く
-        if (uploadedAt) await this.env.CACHE.put(cacheKey, uploadedAt);
+        if (uploadedAt) await this.env.CACHE.put(key, uploadedAt);
 
         return uploadedAt;
     }
 
     public async upload() {
-        if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
-        if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
+        const github = this.requireGitHub();
+        const user = await this.authorizeMutation(github);
 
-        const { user: data } = await this.checkAuthAndPermission(Permission.BlogEdit);
-
-        await this.github.useUserGitHubToken(this.env, data.localId);
-
-        const contentType = this.request.headers.get("content-type") || "";
+        const contentType = this.request!.headers.get("content-type") || "";
         if (!contentType.includes("multipart/form-data")) throw HttpError.createBadRequest("multipart/form-data required");
 
-        const formData = await this.request.formData();
+        const formData = await this.request!.formData();
         const file = formData.get("file");
-        let name = formData.get("name") as string | null;
+        const rawName = formData.get("name") as string | null;
 
         if (!(file instanceof File)) throw HttpError.createBadRequest("file is required");
         if (file.size > ImageController.MAX_SIZE) throw HttpError.createBadRequest("Image size must be <= 20MB");
-        if (!this.isImage(file.type)) throw HttpError.createBadRequest("Unsupported image type");
 
-        name = name ? name.replace(/[^a-zA-Z0-9_-]/g, "") : null;
+        const ext = MIME_TO_EXT[file.type];
+        if (!ext) throw HttpError.createBadRequest("Unsupported image type");
 
-        const ext = this.getExt(file.type);
+        const name = rawName ? rawName.replace(/[^a-zA-Z0-9_-]/g, "") : null;
         const filename = name ? `${name}.${ext}` : `${crypto.randomUUID()}.${ext}`;
 
         const base64 = toBase64(await file.arrayBuffer());
-        const res = await this.github.uploadImage(filename, base64, `Upload image ${filename} via Cloudflare Worker`);
+        const res = await github.uploadImage(filename, base64, `Upload image ${filename} via Cloudflare Worker`);
 
         if (!res.ok) throw new CustomHttpError(500, "INTERNAL_SERVER_ERROR", "GitHub upload failed", await res.text());
 
         const result: any = await res.json();
 
-        await logInfo(this.request, this.env, "image", `Upload image "${filename}" by ${data.localId}`);
+        await logInfo(this.request!, this.env, "image", `Upload image "${filename}" by ${user.localId}`);
 
         return createJsonResponse({
             success: true,
@@ -123,48 +152,25 @@ export class ImageController extends IController {
     }
 
     public async delete() {
-        if (!this.github) throw HttpError.createInternalServerError("GitHub service not initialized");
-        if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-        
-        const { user: data } = await this.checkAuthAndPermission(Permission.BlogEdit);
+        const github = this.requireGitHub();
+        const user = await this.authorizeMutation(github);
 
-        await this.github.useUserGitHubToken(this.env, data.localId);
-
-        const body: any = await this.request.json();
+        const body: any = await this.request!.json();
         const filename = body?.filename as string;
         const sha = body?.sha as string | undefined;
 
         if (!filename) throw HttpError.createBadRequest("filename is required");
-        await this.github.deleteImage(filename, sha);
+        await github.deleteImage(filename, sha);
 
         // アップロード日時キャッシュも掃除する (sha は削除後に再利用されない)
-        if (sha) await this.env.CACHE.delete(`img-date:${sha}`);
+        if (sha) await this.env.CACHE.delete(dateCacheKey(sha));
 
-        await logInfo(this.request, this.env, "image", `Deleted image "${filename}" by ${data.localId}`);
+        await logInfo(this.request!, this.env, "image", `Deleted image "${filename}" by ${user.localId}`);
 
         return createJsonResponse({ success: true, filename });
     }
 
     private isImageName(name: string) {
         return /\.(jpg|jpeg|png|webp|gif)$/i.test(name);
-    }
-
-    private isImage(type: string) {
-        return ["image/jpeg", "image/png", "image/webp", "image/gif"].includes(type);
-    }
-
-    private getExt(type: string) {
-        switch (type) {
-            case "image/jpeg": 
-                return "jpg";
-            case "image/png":
-                return "png";
-            case "image/webp":
-                return "webp";
-            case "image/gif":
-                return "gif";
-            default: 
-                return "bin";
-        }
     }
 }
