@@ -19,6 +19,9 @@ export enum Permission {
 
     PrivatePostView = 1 << 10,
     PrivatePostEdit = 1 << 11,
+
+    ImageUpload = 1 << 12,
+    ImageDelete = 1 << 13,
 }
 
 /**
@@ -45,7 +48,8 @@ const EXECUTIVE_ROLES = Role.Manager | Role.Accountant | Role.ChiefClerk | Role.
 /** 部員の標準権限 */
 export const MEMBER_DEFAULT_PERMISSIONS =
     Permission.DiscordInviteView | Permission.MemberView | Permission.BlogEdit |
-    Permission.PrivatePostView | Permission.PrivatePostEdit;
+    Permission.PrivatePostView | Permission.PrivatePostEdit |
+    Permission.ImageUpload | Permission.ImageDelete;
 
 /** 幹部の標準権限 */
 export const EXECUTIVE_DEFAULT_PERMISSIONS =

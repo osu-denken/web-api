@@ -53,10 +53,10 @@ export class ImageController extends IController {
      * POST 検証・権限チェックを行い、ユーザーの GitHub トークンに切り替える。
      * @returns 認証済みユーザー
      */
-    private async authorizeMutation(github: GitHubService): Promise<FirebaseUser> {
+    private async authorizeMutation(github: GitHubService, required: Permission): Promise<FirebaseUser> {
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
 
-        const { user } = await this.checkAuthAndPermission(Permission.BlogEdit);
+        const { user } = await this.checkAuthAndPermission(required);
         await github.useUserGitHubToken(this.env, user.localId);
 
         return user;
@@ -123,7 +123,7 @@ export class ImageController extends IController {
 
     public async upload() {
         const github = this.requireGitHub();
-        const user = await this.authorizeMutation(github);
+        const user = await this.authorizeMutation(github, Permission.ImageUpload);
 
         const contentType = this.request!.headers.get("content-type") || "";
         if (!contentType.includes("multipart/form-data")) throw HttpError.createBadRequest("multipart/form-data required");
@@ -160,7 +160,7 @@ export class ImageController extends IController {
 
     public async delete() {
         const github = this.requireGitHub();
-        const user = await this.authorizeMutation(github);
+        const user = await this.authorizeMutation(github, Permission.ImageDelete);
 
         const body: any = await this.request!.json();
         const filename = body?.filename as string;
