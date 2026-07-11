@@ -119,6 +119,35 @@ export class FirebaseService {
         return await res.json();
     }
 
+    /**
+     * アカウントに紐づくログイン手段の providerId 一覧を返す。
+     * 例: ["password", "google.com"]
+     * @param idToken ログイン中のユーザーの ID トークン
+     */
+    async getSignInProviders(idToken: string): Promise<string[]> {
+        const res = await this.request("lookup", { idToken });
+        const data: any = await res.json();
+
+        const user = data.users?.[0];
+        if (!res.ok || !user) throw HttpError.createUnauthorizedInvalidToken();
+
+        return (user.providerUserInfo ?? []).map((p: any) => p.providerId);
+    }
+
+    /**
+     * アカウントから指定プロバイダの連携を外す
+     * @param idToken ログイン中のユーザーの ID トークン
+     * @param providerId 例: "google.com"
+     */
+    async unlinkProvider(idToken: string, providerId: string) {
+        const res = await this.request("update", {
+            idToken,
+            deleteProvider: [providerId],
+            returnSecureToken: true
+        });
+        return await res.json();
+    }
+
     async verifyIdToken(idToken: string): Promise<FirebaseUser> {
         const res = await this.request("lookup", { idToken });
         const data: any = await res.json();

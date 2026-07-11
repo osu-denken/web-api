@@ -30,6 +30,10 @@ export class UserController extends IController {
                 return await this.google();
             case "linkGoogle":
                 return await this.linkGoogle();
+            case "unlinkGoogle":
+                return await this.unlinkGoogle();
+            case "providers":
+                return await this.providers();
             case "loginTotp":
                 return await this.loginTotp();
             case "totp":
@@ -209,6 +213,11 @@ export class UserController extends IController {
         if (!data.email || !data.email.endsWith(this.env.ALLOWED_EMAIL_DOMAIN) || data.emailVerified === false)
             throw HttpError.createForbidden(`Email must be a verified ${this.env.ALLOWED_EMAIL_DOMAIN} address`);
 
+        // signInWithIdp は Google プロフィール名を displayName に載せてくる。
+        // 本人が設定した表示名を優先し、Google 名で上書きしない (未設定ならフロントが学籍番号にフォールバック)
+        const account = await this.firebase.verifyIdToken(data.idToken);
+        data.displayName = account.displayName;
+
         // 既存アカウントに2段階認証が付いていれば、コード検証まではトークンを渡さない
         const pending = await this.mfa.createPendingIfEnabled({
             localId: data.localId,
@@ -256,6 +265,52 @@ export class UserController extends IController {
         await logInfo(this.request, this.env, "link_google", `Link Google "${data.email}" to ${data.localId}`);
 
         return createJsonResponse({ success: true, idToken: data.idToken, refreshToken: data.refreshToken });
+    }
+
+    /**
+     * ログイン中のアカウントに紐づくログイン手段を返す。
+     * 設定画面で連携ボタンの出し分けに使う
+     */
+    public async providers() {
+        if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
+        if (!this.firebase) throw HttpError.createInternalServerError("Firebase service not initialized");
+        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
+
+        const providers = await this.firebase.getSignInProviders(this.authorization);
+
+        return createJsonResponse({
+            success: true,
+            hasPassword: providers.includes("password"),
+            hasGoogle: providers.includes("google.com")
+        });
+    }
+
+    /**
+     * Google 連携を解除する。
+     * ただしパスワード等の代替ログイン手段が無い場合は、解除すると二度と
+     * ログインできなくなるため拒否する
+     */
+    public async unlinkGoogle() {
+        if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
+        if (!this.firebase) throw HttpError.createInternalServerError("Firebase service not initialized");
+        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
+
+        const providers = await this.firebase.getSignInProviders(this.authorization);
+
+        if (!providers.includes("google.com"))
+            return createJsonResponse({ success: false, message: "NOT_LINKED" });
+
+        // Google が唯一のログイン手段なら、外すとログイン不能になるので止める
+        if (!providers.includes("password"))
+            return createJsonResponse({ success: false, message: "NO_OTHER_METHOD" });
+
+        const data: any = await this.firebase.unlinkProvider(this.authorization, "google.com");
+        if (!data?.localId)
+            return createJsonResponse({ success: false, message: data?.error?.message ?? "UNLINK_FAILED" });
+
+        await logInfo(this.request, this.env, "unlink_google", `Unlink Google from ${data.localId}`);
+
+        return createJsonResponse({ success: true });
     }
 
     /**
