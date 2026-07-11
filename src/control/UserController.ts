@@ -81,13 +81,11 @@ export class UserController extends IController {
      */
     public async exists() {
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
-        
+
         let { email } = await this.request.json() as { email: string };
         if (!email) throw new HttpError(400, "BAD_REQUEST", "email is required");
 
-        email = this.normalizeEmail(email);
-
-        const exists = await this.firebase?.existUser(email);
+        const exists = await this.firebase?.existUser(this.normalizeEmail(email));
         return createJsonResponse({ exists });
     }
 
