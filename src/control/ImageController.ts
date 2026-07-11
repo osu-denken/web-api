@@ -137,6 +137,9 @@ export class ImageController extends IController {
         if (!filename) throw HttpError.createBadRequest("filename is required");
         await this.github.deleteImage(filename, sha);
 
+        // アップロード日時キャッシュも掃除する (sha は削除後に再利用されない)
+        if (sha) await this.env.CACHE.delete(`img-date:${sha}`);
+
         await logInfo(this.request, this.env, "image", `Deleted image "${filename}" by ${data.localId}`);
 
         return createJsonResponse({ success: true, filename });
