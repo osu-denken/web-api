@@ -1,7 +1,7 @@
 import { CustomHttpError } from "../CustomHttpError";
 import { HttpError } from "../HttpError";
 import { b64ToStr, toBase64, parseFrontMatter } from "../utils";
-import { GitHubClient } from "./github-client";
+import { GitHubClient, OWNER, REPO } from "./github-client";
 
 /**
  * blog リポジトリのコンテンツ。記事、固定ページ、画像を扱う。
@@ -123,6 +123,23 @@ export class GitHubBlogClient extends GitHubClient {
             throw new HttpError(404, "NOT_FOUND", "Image directory not found");
 
         return res;
+    }
+
+    /**
+     * 画像を最後にコミットした日時 (= アップロード日時) を取得する。
+     * Contents API は日時を返さないので commits API を path で絞って引く。
+     * @param filename images/ 配下のファイル名
+     * @returns ISO8601 文字列。取得できなければ null
+     */
+    public async getImageCommitDate(filename: string): Promise<string | null> {
+        await GitHubBlogClient.checkSafePath(filename, true);
+
+        const url = `https://api.github.com/repos/${OWNER}/${REPO}/commits?path=images/${encodeURIComponent(filename)}&per_page=1`;
+        const res = await this.request(url, "GET");
+        if (!res.ok) return null;
+
+        const commits: any[] = await res.json();
+        return commits[0]?.commit?.committer?.date ?? null;
     }
 
     /**

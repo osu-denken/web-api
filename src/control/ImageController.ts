@@ -43,16 +43,42 @@ export class ImageController extends IController {
 
         const entries: any[] = await res.json();
 
-        return createJsonResponse(
-            entries
-                .filter(entry => entry.type === "file" && this.isImageName(entry.name))
-                .map(entry => ({
-                    name: entry.name,
-                    sha: entry.sha,
-                    size: entry.size,
-                    url: `/images/${entry.name}`
-                }))
-        );
+        const images = entries
+            .filter(entry => entry.type === "file" && this.isImageName(entry.name))
+            .map(entry => ({
+                name: entry.name as string,
+                sha: entry.sha as string,
+                size: entry.size as number,
+                url: `/images/${entry.name}`
+            }));
+
+        // アップロード日時を付与する。sha は内容が変われば必ず変わるので、
+        // sha ごとにコミット日時を KV へ恒久キャッシュして commits API の呼び出しを抑える
+        const withDates = await Promise.all(images.map(async img => {
+            const uploadedAt = await this.resolveUploadedAt(img.sha, img.name);
+            return { ...img, uploadedAt };
+        }));
+
+        return createJsonResponse(withDates);
+    }
+
+    /**
+     * 画像のアップロード日時を KV キャッシュ経由で解決する
+     * @param sha GitHub 上の blob SHA (キャッシュキー)
+     * @param filename images/ 配下のファイル名
+     * @returns ISO8601 文字列、取得できなければ null
+     */
+    private async resolveUploadedAt(sha: string, filename: string): Promise<string | null> {
+        const cacheKey = `img-date:${sha}`;
+
+        const cached = await this.env.CACHE.get(cacheKey);
+        if (cached) return cached;
+
+        const uploadedAt = await this.github!.getImageCommitDate(filename);
+        // sha に対する内容は不変なので TTL なしで置く
+        if (uploadedAt) await this.env.CACHE.put(cacheKey, uploadedAt);
+
+        return uploadedAt;
     }
 
     public async upload() {
