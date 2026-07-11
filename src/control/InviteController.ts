@@ -36,7 +36,7 @@ export class InviteController extends IController {
     public async create() {
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
         
-        const { user: data } = await this.checkAuthAndPermission(Permission.MemberManage);
+        const { user: data } = await this.checkAuthAndPermission(Permission.InviteCodeCreate);
         
         const code = generateInviteCode(12);
 
@@ -50,7 +50,7 @@ export class InviteController extends IController {
     public async delete() {
         if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
         
-        const { user: data } = await this.checkAuthAndPermission(Permission.MemberManage);
+        const { user: data } = await this.checkAuthAndPermission(Permission.InviteCodeCreate);
         
         const { code } = await this.request.json() as { code: string };
 
