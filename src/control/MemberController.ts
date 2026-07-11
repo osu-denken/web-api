@@ -3,6 +3,7 @@ import { Member, MemberStatus, normalizeStudentEmail, normalizeStudentId, toAdmi
 import { MemberUpdateService, UpdateBody } from "../util/member-update";
 import { normalizeRoles, Permission, Role } from "../util/permission";
 import { MemberRepository } from "../util/service/members-d1";
+import { sendJoinNotification } from "../util/service/mailer";
 import { createJsonResponse, logInfo } from "../util/utils";
 import { IController } from "./IController";
 
@@ -12,6 +13,10 @@ interface RegisterBody {
     furigana?: string | null;
     tel?: string | null;
     birthday?: string | null;
+    // 以下は任意。名簿の固定列ではないので customData に入れる
+    hobby?: string | null;
+    wish?: string | null;
+    note?: string | null;
 }
 
 /** 電話番号の閲覧・編集は幹部に限る */
@@ -73,6 +78,13 @@ export class MemberController extends IController {
 
         await this.ensureNotRegistered(user.localId, studentId);
 
+        // 任意項目は空を捨てて customData にまとめる
+        const customData: Record<string, string> = {};
+        if (body.birthday) customData.birthday = body.birthday;
+        if (body.hobby?.trim()) customData.hobby = body.hobby.trim();
+        if (body.wish?.trim()) customData.wish = body.wish.trim();
+        if (body.note?.trim()) customData.note = body.note.trim();
+
         await this.repository.createPreActive({
             studentId,
             email,
@@ -80,10 +92,23 @@ export class MemberController extends IController {
             furigana: body.furigana?.trim() || null,
             tel: body.tel?.trim() || null,
             localId: user.localId,
-            customData: body.birthday ? { birthday: body.birthday } : {}
+            customData
         });
 
         await logInfo(this.request!, this.env, "member_register", `Provisional register "${studentId}" (${email})`);
+
+        // 部のメールへ申請内容を通知する (メール未設定なら内部でスキップ)
+        await sendJoinNotification(this.env, {
+            studentId,
+            email,
+            name: body.name.trim(),
+            furigana: body.furigana ?? null,
+            birthday: body.birthday ?? null,
+            tel: body.tel ?? null,
+            hobby: body.hobby ?? null,
+            wish: body.wish ?? null,
+            note: body.note ?? null
+        });
 
         return createJsonResponse({ success: true });
     }

@@ -59,7 +59,10 @@
 		"ALLOWED_EMAIL_DOMAIN": "ge.osaka-sandai.ac.jp",
 		// 新規登録は Google と招待コードのみ。自己登録と合言葉は既定でオフ ("true" で再開)
 		"ALLOW_SELF_REGISTRATION": "false",
-		"ALLOW_PASSPHRASE_REGISTRATION": "false"
+		"ALLOW_PASSPHRASE_REGISTRATION": "false",
+		// 入部申請の通知メールを中継する Apps Script ウェブアプリの URL。
+		// MAIL_WEBHOOK_SECRET は `wrangler secret put MAIL_WEBHOOK_SECRET` で設定する
+		// "MAIL_WEBHOOK_URL": "" // こっちもシークレットにしておいた
 	}
 	/**
 	 * Note: Use secrets to store sensitive data.

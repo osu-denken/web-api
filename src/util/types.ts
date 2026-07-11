@@ -18,6 +18,11 @@ export interface Env {
 	ALLOW_SELF_REGISTRATION?: string;
 	ALLOW_PASSPHRASE_REGISTRATION?: string;
 
+	// 入部申請の通知メール。部の Google アカウントでデプロイした Apps Script ウェブアプリに
+	// 中継させる。URL は vars、SECRET は Cloudflare secret に置く。未設定なら送らない
+	MAIL_WEBHOOK_URL?: string;
+	MAIL_WEBHOOK_SECRET?: string;
+
 	// Key-Value
     BLOG_META: KVNamespace;
 	INVITE_CODE: KVNamespace;
