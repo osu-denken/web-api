@@ -104,13 +104,18 @@ export class FirebaseService {
      * @param providerId 例: "google.com"
      * @param requestUri 認証済みドメインのURL (Firebase の承認済みドメインに含まれること)
      */
-    async signInWithIdp(providerIdToken: string, providerId: string, requestUri: string) {
-        const res = await this.request("signInWithIdp", {
+    async signInWithIdp(providerIdToken: string, providerId: string, requestUri: string, idToken?: string) {
+        const body: any = {
             postBody: `id_token=${encodeURIComponent(providerIdToken)}&providerId=${encodeURIComponent(providerId)}`,
             requestUri,
             returnSecureToken: true,
             returnIdpCredential: true
-        });
+        };
+
+        // idToken を渡すと、新規ログインではなく既存アカウントへの IdP リンクになる
+        if (idToken) body.idToken = idToken;
+
+        const res = await this.request("signInWithIdp", body);
         return await res.json();
     }
 

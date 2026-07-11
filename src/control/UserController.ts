@@ -28,6 +28,8 @@ export class UserController extends IController {
                 return await this.login();
             case "google":
                 return await this.google();
+            case "linkGoogle":
+                return await this.linkGoogle();
             case "loginTotp":
                 return await this.loginTotp();
             case "totp":
@@ -226,6 +228,34 @@ export class UserController extends IController {
         data.success = true;
 
         return createJsonResponse(data);
+    }
+
+    /**
+     * ログイン中のアカウントに大学 Google アカウントを連携する。
+     * 既存のパスワードユーザーが以後ソーシャルログインも使えるようにする
+     */
+    public async linkGoogle() {
+        if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
+        if (!this.firebase) throw HttpError.createInternalServerError("Firebase service not initialized");
+        if (!this.authorization) throw HttpError.createUnauthorizedHeaderRequired();
+
+        const { credential } = await this.request.json() as { credential?: string };
+        if (!credential) throw new HttpError(400, "BAD_REQUEST", "credential is required");
+
+        const claimEmail = this.peekEmail(credential);
+        if (!claimEmail || !claimEmail.endsWith(this.env.ALLOWED_EMAIL_DOMAIN))
+            throw HttpError.createForbidden(`Email must be from ${this.env.ALLOWED_EMAIL_DOMAIN} domain`);
+
+        const requestUri = this.request.headers.get("Origin") ?? "https://osu-denken.github.io";
+        // idToken を渡すことで、新規サインインではなく現在のアカウントへの連携になる
+        const data: any = await this.firebase.signInWithIdp(credential, "google.com", requestUri, this.authorization);
+
+        if (data?.errorMessage || !data?.idToken)
+            return createJsonResponse({ success: false, message: data?.errorMessage ?? "LINK_FAILED" });
+
+        await logInfo(this.request, this.env, "link_google", `Link Google "${data.email}" to ${data.localId}`);
+
+        return createJsonResponse({ success: true, idToken: data.idToken, refreshToken: data.refreshToken });
     }
 
     /**
