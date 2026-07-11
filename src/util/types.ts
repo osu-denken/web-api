@@ -13,6 +13,11 @@ export interface Env {
 
 	ALLOWED_EMAIL_DOMAIN: string;
 
+	// 登録経路の有効/無効。"true" の文字列でのみ有効。未設定は無効扱い。
+	// 招待コード (invite) は常に有効で、ここでは制御しない
+	ALLOW_SELF_REGISTRATION?: string;
+	ALLOW_PASSPHRASE_REGISTRATION?: string;
+
 	// Key-Value
     BLOG_META: KVNamespace;
 	INVITE_CODE: KVNamespace;

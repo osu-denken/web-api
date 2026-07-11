@@ -56,7 +56,10 @@
 	 * https://developers.cloudflare.com/workers/wrangler/configuration/#environment-variables
 	 */
 	"vars": {
-		"ALLOWED_EMAIL_DOMAIN": "ge.osaka-sandai.ac.jp"
+		"ALLOWED_EMAIL_DOMAIN": "ge.osaka-sandai.ac.jp",
+		// 新規登録は Google と招待コードのみ。自己登録と合言葉は既定でオフ ("true" で再開)
+		"ALLOW_SELF_REGISTRATION": "false",
+		"ALLOW_PASSPHRASE_REGISTRATION": "false"
 	}
 	/**
 	 * Note: Use secrets to store sensitive data.

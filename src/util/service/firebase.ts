@@ -97,6 +97,23 @@ export class FirebaseService {
         return await res.json();
     }
 
+    /**
+     * Google などの IdP が発行した ID トークンを Firebase のトークンに交換する。
+     * アカウントが無ければ作成される。署名検証は Identity Toolkit 側が行う。
+     * @param providerIdToken IdP (Google) の ID トークン
+     * @param providerId 例: "google.com"
+     * @param requestUri 認証済みドメインのURL (Firebase の承認済みドメインに含まれること)
+     */
+    async signInWithIdp(providerIdToken: string, providerId: string, requestUri: string) {
+        const res = await this.request("signInWithIdp", {
+            postBody: `id_token=${encodeURIComponent(providerIdToken)}&providerId=${encodeURIComponent(providerId)}`,
+            requestUri,
+            returnSecureToken: true,
+            returnIdpCredential: true
+        });
+        return await res.json();
+    }
+
     async verifyIdToken(idToken: string): Promise<FirebaseUser> {
         const res = await this.request("lookup", { idToken });
         const data: any = await res.json();

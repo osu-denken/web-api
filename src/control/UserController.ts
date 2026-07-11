@@ -26,6 +26,8 @@ export class UserController extends IController {
                 return await this.verifyEmail();
             case "login":
                 return await this.login();
+            case "google":
+                return await this.google();
             case "loginTotp":
                 return await this.loginTotp();
             case "totp":
@@ -160,6 +162,73 @@ export class UserController extends IController {
     }
 
     /**
+     * Google の ID トークンから読み取れるメールアドレスを取り出す (署名検証はしない)。
+     * ドメインの早期チェック用。本検証は signInWithIdp が署名ごと行う
+     * @param credential Google ID トークン (JWT)
+     */
+    private peekEmail(credential: string): string | null {
+        const parts = credential.split(".");
+        if (parts.length < 2) return null;
+
+        try {
+            const json = atob(parts[1].replace(/-/g, "+").replace(/_/g, "/"));
+            const payload = JSON.parse(json);
+            return typeof payload.email === "string" ? payload.email : null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * 大学 Google アカウントでのログイン/新規登録。
+     * GIS が発行した ID トークンを Firebase のトークンに交換する。
+     * ドメイン外・未確認メールは弾く
+     */
+    public async google() {
+        if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
+        if (!this.firebase) throw HttpError.createInternalServerError("Firebase service not initialized");
+
+        await this.rateLimit("loginIp");
+
+        const { credential } = await this.request.json() as { credential?: string };
+        if (!credential) throw new HttpError(400, "BAD_REQUEST", "credential is required");
+
+        // 署名検証前でも、明らかにドメイン外なら Firebase アカウントを作らせずに弾く
+        const claimEmail = this.peekEmail(credential);
+        if (!claimEmail || !claimEmail.endsWith(this.env.ALLOWED_EMAIL_DOMAIN))
+            throw HttpError.createForbidden(`Email must be from ${this.env.ALLOWED_EMAIL_DOMAIN} domain`);
+
+        const requestUri = this.request.headers.get("Origin") ?? "https://osu-denken.github.io";
+        const data: any = await this.firebase.signInWithIdp(credential, "google.com", requestUri);
+
+        if (!data?.idToken || !data?.refreshToken) return createJsonResponse(data);
+
+        // signInWithIdp の結果を信頼する。Google 由来はメール確認済みのはず
+        if (!data.email || !data.email.endsWith(this.env.ALLOWED_EMAIL_DOMAIN) || data.emailVerified === false)
+            throw HttpError.createForbidden(`Email must be a verified ${this.env.ALLOWED_EMAIL_DOMAIN} address`);
+
+        // 既存アカウントに2段階認証が付いていれば、コード検証まではトークンを渡さない
+        const pending = await this.mfa.createPendingIfEnabled({
+            localId: data.localId,
+            email: data.email,
+            idToken: data.idToken,
+            refreshToken: data.refreshToken,
+            displayName: data.displayName
+        });
+
+        if (pending) {
+            await logInfo(this.request, this.env, "login", `Google login "${data.email}" awaiting 2FA`);
+            return createJsonResponse({ success: true, mfaRequired: true, ...pending });
+        }
+
+        await logInfo(this.request, this.env, "login", `Google login "${data.email}"`);
+
+        data.success = true;
+
+        return createJsonResponse(data);
+    }
+
+    /**
      * 2段階認証のコードを検証し、退避しておいたトークンを渡す
      */
     public async loginTotp() {
@@ -224,10 +293,12 @@ export class UserController extends IController {
 
         const json: any = await this.request.json();
 
-        const data: any = await this.firebase?.updateUser(this.authorization, json.displayName, json.photoUrl, json.password);
+        // パスワードはセッションだけで変更できると乗っ取り時に締め出されるため、
+        // ここでは扱わない。設定・再設定はメール確認を経る /user/resetPassword に一本化する
+        const data: any = await this.firebase?.updateUser(this.authorization, json.displayName, json.photoUrl);
         data.success = true;
 
-        await logInfo(this.request, this.env, "update_user", `Update user "${data.localId}": ${JSON.stringify(json, null, 2)}`);
+        await logInfo(this.request, this.env, "update_user", `Update user "${data.localId}": displayName/photoUrl`);
 
         return createJsonResponse(data);
     }

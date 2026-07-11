@@ -51,6 +51,18 @@ export class RegistrationService {
     }
 
     /**
+     * その登録経路が config で有効か。招待コードは常に有効。
+     * 自己登録と合言葉は既定オフで、env が "true" のときだけ通す
+     * @param mode 登録経路
+     */
+    private isModeEnabled(mode: RegisterMode): boolean {
+        if (mode === "invite") return true;
+        if (mode === "self") return this.env.ALLOW_SELF_REGISTRATION === "true";
+        if (mode === "master") return this.env.ALLOW_PASSPHRASE_REGISTRATION === "true";
+        return false;
+    }
+
+    /**
      * ユーザーを登録する
      * @param body 登録リクエストの本文
      */
@@ -58,6 +70,10 @@ export class RegistrationService {
         await new RateLimiter(this.env).consume(this.request, "registerIp");
 
         const mode = await this.classify(body.passphrase);
+
+        // 無効化された経路 (既定では self と master) は、コードは残しつつ config で塞ぐ
+        if (!this.isModeEnabled(mode))
+            throw new HttpError(403, "REGISTRATION_DISABLED", `Registration via ${mode} is disabled`);
 
         // 招待経由は部員が門番になっているので、bot 確認は開かれた自己登録にだけ課す
         if (mode === "self")
