@@ -17,6 +17,7 @@ export class PortalController extends IController {
     public route() {
         if (this.path[0] === "github") {
             if (this.path[1] === "invite") return this.githubInvite();
+            if (this.path[1] === "join") return this.githubJoin();
             if (this.path[1] === "token") return this.githubToken();
         }
 
@@ -140,6 +141,42 @@ export class PortalController extends IController {
         return createJsonResponse({
             success: true,
             invited: email
+        });
+    }
+
+    /**
+     * 部員が自分の GitHub アカウント名を指定して Organization への招待を受け取る。
+     * 幹部でなくても、認証済みの部員であれば自分で参加できる。
+     */
+    public async githubJoin() {
+        if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
+
+        // 認証済みの部員であることだけ確認する (特別な権限は不要)
+        const auth = await this.resolveAuth();
+
+        const { username } = await this.request.json() as { username: string };
+        const name = username?.trim();
+        if (!name) throw new HttpError(400, "BAD_REQUEST", "username is required");
+
+        // GitHub のユーザー名は英数字とハイフン、先頭末尾はハイフン不可、1〜39文字
+        if (!/^[a-zA-Z0-9](?:[a-zA-Z0-9]|-(?=[a-zA-Z0-9])){0,38}$/.test(name))
+            throw new HttpError(400, "BAD_REQUEST", "Invalid GitHub username");
+
+        const res = await this.github?.inviteOrganizationByUsername(name);
+        if (!res) throw new HttpError(500, "INTERNAL_SERVER_ERROR", "GitHub service not available");
+
+        const data: any = await res.json();
+
+        if (!res.ok)
+            throw new HttpError(res.status, res.statusText, data.message || "GitHub invite failed");
+
+        await logInfo(this.request, this.env, "github_join",
+            `Invite "${name}" to org by ${auth.member.email} (#${auth.member.id})`);
+
+        return createJsonResponse({
+            success: true,
+            username: name,
+            state: data.state ?? "pending"
         });
     }
 

@@ -45,6 +45,26 @@ export class GitHubService extends GitHubBlogClient {
     }
 
     /**
+     * GitHub のユーザー名を指定して Organization に招待する。
+     * PUT /orgs/{org}/memberships/{username} は招待メールを送り、状態は pending になる。
+     * @param username GitHub のアカウント名
+     */
+    public async inviteOrganizationByUsername(username: string) {
+        const url = `https://api.github.com/orgs/${OWNER}/memberships/${encodeURIComponent(username)}`;
+
+        return fetch(url, {
+            method: "PUT",
+            headers: {
+                "Authorization": `token ${this.token}`,
+                "Content-Type": "application/json",
+                "Accept": "application/vnd.github+json",
+                "User-Agent": "osu-denken-admin-cloudflare-worker"
+            },
+            body: JSON.stringify({ role: "member" })
+        });
+    }
+
+    /**
      * fake terminal の編集対象として許可されたファイルかどうか
      * @param filename ファイル名 (.md を含む)
      */
