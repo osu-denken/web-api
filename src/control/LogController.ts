@@ -43,13 +43,13 @@ export class LogController extends IController {
         const limit = Math.min(Math.max(Number(params.get("limit")) || 50, 1), 100);
 
         // キーは `${type}:${反転タイムスタンプ}` なので、種別指定時は prefix で新しい順に取れる
-        const listed = await this.env.LOGS.list<LogMeta>({
+        const listed = await this.env.LOGS.list({
             prefix: type ? `${type}:` : undefined,
             cursor,
             limit,
         });
 
-        const logs = listed.keys.map((key: any) => {
+        const logs: LogMeta[] = listed.keys.map((key: any) => {
             const meta = key.metadata as LogMeta | undefined;
             // メタデータ導入前の古いキー (`${type}:${ts}`) はキー名から最低限を補う
             return meta ?? {
@@ -62,7 +62,7 @@ export class LogController extends IController {
         });
 
         // prefix なし (全種別) だと種別ごとにまとまるため、ページ内を時刻降順にそろえる
-        logs.sort((a, b) => b.ts - a.ts);
+        logs.sort((a: LogMeta, b: LogMeta) => b.ts - a.ts);
 
         return createJsonResponse({
             logs,
