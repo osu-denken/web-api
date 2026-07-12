@@ -18,6 +18,7 @@ import { PrivatePostRepository } from "./util/service/private-posts-d1";
 import { PrivatePostController } from "./control/PrivatePostController";
 import { SitePageController } from "./control/SitePageController";
 import { LogController } from "./control/LogController";
+import { GitHubController } from "./control/GitHubController";
 
 type ControllerFactory = (path: string[]) => IController;
 
@@ -29,7 +30,7 @@ const routes: Record<string, ControllerFactory> = {
   "image": (path) => new ImageController(path),
   "portal": (path) => new PortalController(path),
   "discord": (path) => new PortalController(path),
-  "github": (path) => new PortalController(path),
+  "github": (path) => new GitHubController(path),
   "switchbot": (path) => new SwitchBotController(path),
   "members": (path) => new MemberController(path),
   "terminal": (path) => new TerminalController(path),
