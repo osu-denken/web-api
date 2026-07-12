@@ -149,6 +149,34 @@ Firebase Authentication を利用したユーザー管理 API である。ユー
 - **ボディ**: `{ "email": "gXXXXXXX@ge.osaka-sandai.ac.jp" }`
 - **説明**: パスワードリセットメールを送信する。
 
+#### `POST /user/verifyEmail`
+
+- **ヘッダー**: `Authorization: Bearer <ID_TOKEN>` (必須)
+- **説明**: ログイン中のユーザーへ確認メールを再送する。
+
+#### `POST /user/refresh`
+
+- **ボディ**: `{ "refreshToken": "..." }`
+- **説明**: リフレッシュトークンから新しい ID トークンを取得する。
+
+#### Google連携
+
+大学のGoogleアカウント (`@ge.osaka-sandai.ac.jp`) でのログインと、既存アカウントへの連携を扱う。
+
+- `POST /user/google` … Google の ID トークン (`{ "credential": "..." }`) を Firebase のトークンに交換してログイン/新規登録する。ドメイン外・未確認メールは拒否する。
+- `POST /user/linkGoogle` … ログイン中のアカウントに Googleアカウントを連携する (以後どちらでもログイン可)。要認証。
+- `POST /user/unlinkGoogle` … Google連携を解除する。他にログイン手段が無い場合は拒否する。要認証。
+- `POST /user/providers` … そのアカウントに紐づくログイン手段 (`hasPassword` / `hasGoogle`) を返す。要認証。
+
+#### 2段階認証 (TOTP)
+
+- `POST /user/loginTotp` … ログイン後に預けられた `mfaPendingToken` と6桁 `code` を検証し、トークンを受け取る。
+- `POST /user/totp/setup` … シークレットと QR を発行する (まだ有効化しない)。要認証。
+- `POST /user/totp/enable` … `code` を検証して2段階認証を有効化し、リカバリコードを返す。要認証。
+- `POST /user/totp/disable` … `code` (またはリカバリコード) を検証して解除する。要認証。
+
+> `POST /user/login` および `POST /user/google` は、2段階認証が有効なアカウントでは `{ "mfaRequired": true, "mfaPendingToken": "..." }` を返し、トークンは渡さない。`/user/loginTotp` での検証が必要になる。
+
 ---
 
 ### Invite API (`/invite`)
@@ -164,7 +192,7 @@ Firebase Authentication を利用したユーザー管理 API である。ユー
 #### `POST /invite/create`
 
 - **ヘッダー**: `Authorization: Bearer <ID_TOKEN>` (必須)
-- **説明**: 新しい招待コードを生成する。コードは24時間有効である。認証されたユーザーのみ実行可能である。
+- **説明**: 新しい招待コードを生成する。コードは24時間有効である。`InviteCodeCreate` 権限が必要である。
 
 #### `POST /invite/delete`
 
@@ -188,7 +216,30 @@ Firebase Authentication を利用したユーザー管理 API である。ユー
 
 - **ヘッダー**: `Authorization: Bearer <ID_TOKEN>` (必須)
 - **ボディ**: `{ "email": "..." }`
-- **説明**: 指定したメールアドレスに GitHub Organization への招待を送信する。
+- **説明**: 幹部が指定したメールアドレスを GitHub Organization に招待する。`MemberManage` 権限が必要である。
+
+#### `POST /github/join`
+
+- **ヘッダー**: `Authorization: Bearer <ID_TOKEN>` (必須)
+- **ボディ**: `{ "username": "..." }` (連携済みなら省略可)
+- **説明**: 部員自身が GitHub ユーザー名で Organization への招待を受け取る。連携済みならユーザー名を自動取得する。
+
+#### `POST /github/username`
+
+- **ヘッダー**: `Authorization: Bearer <ID_TOKEN>` (必須)
+- **説明**: 連携済みの GitHub ログイン名を返す (未連携なら `null`)。
+
+#### `/github/token`
+
+- **ヘッダー**: `Authorization: Bearer <ID_TOKEN>` (必須)。`BlogEdit` 権限が必要。
+- **説明**: GitHub Personal Access Token の確認 (`GET`) / 保存 (`POST`・`PUT`) / 削除 (`DELETE`)。トークンは暗号化して保存される。
+
+#### GitHub OAuth 連携
+
+- `POST /github/oauth/start` … 認可 URL を返す。`BlogEdit` 権限が必要。
+- `GET /github/oauth/callback` … GitHub からのコールバック。認可コードをトークンに交換して保存し、ポータルの連携タブへリダイレクトする。
+
+> ブログ編集や画像アップロードは、各部員が連携した GitHub トークン (OAuth または PAT) を使ってコミットする。
 
 #### `POST /discord/invite`
 
@@ -270,6 +321,78 @@ Firebase Authentication を利用したユーザー管理 API である。ユー
 
 ---
 
+### Image API (`/image`)
+
+ブログ記事に使う画像を GitHub リポジトリの `images/` で管理する API である。
+アップロード・削除には各部員が連携した GitHub トークンを使う。
+
+#### `POST /image/list`
+
+- **ヘッダー**: `Authorization: Bearer <ID_TOKEN>` (必須)。`BlogEdit` 権限が必要。
+- **説明**: アップロード済み画像を一覧する。各画像にアップロード日時 (`uploadedAt`) を付ける。
+
+#### `POST /image/upload`
+
+- **ヘッダー**: `Authorization: Bearer <ID_TOKEN>` (必須)。`ImageUpload` 権限が必要。
+- **ボディ**: `multipart/form-data` の `file` (必須) と `name` (任意)
+- **説明**: 画像をアップロードする。対応形式は `jpg` / `png` / `webp` / `gif`、最大 20MB。`name` を省略すると UUID になる。
+
+#### `POST /image/delete`
+
+- **ヘッダー**: `Authorization: Bearer <ID_TOKEN>` (必須)。`ImageDelete` 権限が必要。
+- **ボディ**: `{ "filename": "...", "sha": "..." }`
+- **説明**: 画像を削除する。参照している記事では表示されなくなる。
+
+---
+
+### SwitchBot API (`/switchbot`)
+
+部室の SwitchBot (Smart Lock) を操作する API である。
+すべて認証と `SwitchBotControl` 権限を要求する。
+
+- `POST /switchbot/validate` … トークンが有効かどうかを確認する。
+- `POST /switchbot/list` … デバイス一覧を返す。
+- `POST /switchbot/lock` … 施錠する。
+- `POST /switchbot/unlock` … 解錠する。
+
+---
+
+### Terminal API (`/terminal`)
+
+トップページのターミナルに表示される `welcome.md` を編集する API である。
+`welcome.md` はサブモジュール [ecrd-fake-terminal](https://github.com/osu-denken/ecrd-fake-terminal) にある。
+
+- `GET /terminal/get?page=welcome` … 内容を取得する。
+- `POST /terminal/update` … 内容を更新し、コミット後に公式サイトの再ビルドを起動する。`PageEdit` 権限が必要。
+
+---
+
+### Site Pages API (`/site-pages`)
+
+公式サイト本体 (Next.js) の固定ページ (`content/` 配下) を編集する API である。
+すべて認証と `PageEdit` 権限を要求する。
+
+- `POST /site-pages/list` … 編集できるファイルの一覧を返す (許可リスト方式)。
+- `GET /site-pages/get?path=<path>` … ファイルの中身を取得する。
+- `POST /site-pages/update` … ファイルを更新し、コミット後に再ビルドを起動する。`.json` は壊れているとサイトのビルドごと落ちるため、保存前に妥当性を検証する。
+
+---
+
+### Logs API (`/logs`)
+
+API の操作ログを閲覧する API である。認証と `LogView` 権限を要求する。
+
+#### `GET /logs/list`
+
+- **ヘッダー**: `Authorization: Bearer <ID_TOKEN>` (必須)
+- **クエリパラメータ**:
+    - `type` (任意): 種別で絞り込む
+    - `cursor` (任意): 続きを取得する
+    - `limit` (任意): 1〜100 (既定 50)
+- **説明**: 操作ログを新しい順に一覧する。
+
+---
+
 ## レート制限
 
 認証まわりのエンドポイントには回数制限がある。超えると `429 TOO_MANY_REQUESTS` を返す。
@@ -315,6 +438,10 @@ IP単位の窓はそれに緩く重ねてあり、アカウントを次々に変
 | `1 << 9` | 512 | `SwitchBotControl` | SwitchBotの操作 | | ○ |
 | `1 << 10` | 1024 | `PrivatePostView` | 非公開記事の閲覧 | ○ | ○ |
 | `1 << 11` | 2048 | `PrivatePostEdit` | 非公開記事の編集 | ○ | ○ |
+| `1 << 12` | 4096 | `ImageUpload` | ブログ用画像のアップロード | ○ | ○ |
+| `1 << 13` | 8192 | `ImageDelete` | ブログ用画像の削除 | ○ | ○ |
+| `1 << 14` | 16384 | `InviteCodeCreate` | 招待コードの作成 | | ○ |
+| `1 << 15` | 32768 | `LogView` | 操作ログの閲覧 | | ○ |
 
 「部員」「幹部」の列は、その役職のデフォルト権限に含まれるかどうかを表す。
 電話番号の閲覧・編集だけは権限ビットではなく、幹部の役職を持つかどうかで判定する。
