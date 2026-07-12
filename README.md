@@ -2,6 +2,8 @@
 大阪産業大学 電子計算研究部の [電研公式サイト](https://osu-denken.github.io/) のバックエンド API <br />
 Cloudflare Workers上で稼働しています。
 
+- https://api.osudenken4dev.workers.dev/
+
 ## 機能
 
 - **Blog API**: GitHubリポジトリ内の Markdownファイルをブログ記事として管理 (取得、一覧、更新) 
