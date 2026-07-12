@@ -11,6 +11,15 @@ export interface Env {
 	SWBOT_TOKEN: string;
 	SWBOT_CLIENT_SECRET: string;
 
+	// GitHub OAuth App。CLIENT_ID は vars、CLIENT_SECRET は Cloudflare secret に置く。
+	// 未設定なら「GitHubで接続」機能は無効 (PAT 手入力は引き続き使える)
+	GITHUB_OAUTH_CLIENT_ID?: string;
+	GITHUB_OAUTH_CLIENT_SECRET?: string;
+	// 要求スコープ。未設定なら "public_repo read:org"
+	GITHUB_OAUTH_SCOPE?: string;
+	// 連携完了後に戻すサイトのオリジン。未設定なら本番ドメイン
+	SITE_ORIGIN?: string;
+
 	ALLOWED_EMAIL_DOMAIN: string;
 
 	// 登録経路の有効/無効。"true" の文字列でのみ有効。未設定は無効扱い。

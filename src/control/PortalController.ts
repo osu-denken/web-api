@@ -2,7 +2,8 @@ import { HttpError } from "../util/HttpError";
 import { ROSTER_STATUSES, toPublicMember } from "../util/member";
 import { Permission } from "../util/permission";
 import { UserCustomService } from "../util/service/user-custom";
-import { createJsonResponse, encrypt, logInfo } from "../util/utils";
+import { GitHubService } from "../util/service/github";
+import { createJsonResponse, encrypt, generateInviteCode, logInfo } from "../util/utils";
 import { IController } from "./IController";
 
 export class PortalController extends IController {
@@ -19,6 +20,10 @@ export class PortalController extends IController {
             if (this.path[1] === "invite") return this.githubInvite();
             if (this.path[1] === "join") return this.githubJoin();
             if (this.path[1] === "token") return this.githubToken();
+            if (this.path[1] === "oauth") {
+                if (this.path[2] === "start") return this.githubOauthStart();
+                if (this.path[2] === "callback") return this.githubOauthCallback();
+            }
         }
 
 
@@ -178,6 +183,77 @@ export class PortalController extends IController {
             username: name,
             state: data.state ?? "pending"
         });
+    }
+
+    /** 連携完了後に戻すサイトのオリジン */
+    private get siteOrigin(): string {
+        return this.env.SITE_ORIGIN || "https://osu-denken.github.io";
+    }
+
+    /**
+     * GitHub OAuth の認可 URL を作って返す。
+     * state を CACHE に保存して、コールバックで本人と紐づけられるようにする。
+     */
+    public async githubOauthStart() {
+        if (this.request?.method !== "POST") throw HttpError.createMethodNotAllowedPostOnly();
+
+        const auth = await this.checkAuthAndPermission(Permission.BlogEdit);
+
+        const clientId = this.env.GITHUB_OAUTH_CLIENT_ID;
+        if (!clientId) throw new HttpError(500, "NOT_CONFIGURED", "GitHub OAuth is not configured");
+
+        // state はワンタイム。コールバックまでの10分だけ localId と結びつける
+        const state = generateInviteCode(32);
+        await this.env.CACHE.put(`ghoauth:${state}`, auth.user.localId, { expirationTtl: 600 });
+
+        const scope = this.env.GITHUB_OAUTH_SCOPE || "public_repo read:org";
+        const redirectUri = `${this.url!.origin}/github/oauth/callback`;
+
+        const url = new URL("https://github.com/login/oauth/authorize");
+        url.searchParams.set("client_id", clientId);
+        url.searchParams.set("redirect_uri", redirectUri);
+        url.searchParams.set("scope", scope);
+        url.searchParams.set("state", state);
+        url.searchParams.set("allow_signup", "false");
+
+        return createJsonResponse({ success: true, url: url.toString() });
+    }
+
+    /**
+     * GitHub からのコールバック。認可コードをトークンに交換して保存する。
+     * ブラウザ遷移なので、結果はポータルの設定タブへリダイレクトで伝える。
+     */
+    public async githubOauthCallback() {
+        const params = this.url!.searchParams;
+        const code = params.get("code");
+        const state = params.get("state");
+
+        const redirectBack = (msg: string) =>
+            Response.redirect(`${this.siteOrigin}/portal/?tab=settings&msg=${encodeURIComponent(msg)}`, 302);
+
+        if (!code || !state) return redirectBack("GitHub連携に失敗しました（不正なコールバック）。");
+
+        // state を消費する。使い回しと期限切れをここで弾く
+        const localId = await this.env.CACHE.get(`ghoauth:${state}`);
+        if (!localId) return redirectBack("GitHub連携の有効期限が切れました。もう一度お試しください。");
+        await this.env.CACHE.delete(`ghoauth:${state}`);
+
+        const clientId = this.env.GITHUB_OAUTH_CLIENT_ID;
+        const clientSecret = this.env.GITHUB_OAUTH_CLIENT_SECRET;
+        if (!clientId || !clientSecret) return redirectBack("GitHub連携が設定されていません。");
+
+        const redirectUri = `${this.url!.origin}/github/oauth/callback`;
+        const token = await GitHubService.exchangeOAuthCode(clientId, clientSecret, code, redirectUri);
+        if (!token) return redirectBack("GitHubのトークン取得に失敗しました。");
+
+        // PAT と同じ場所に保存する。ブログ編集など既存機能はそのまま動く
+        const customData = await this.userCustom.get(localId);
+        customData.githubTokenEncoded = await encrypt(token, this.env.SECRET_KEY);
+        await this.userCustom.put(localId, customData);
+
+        await logInfo(this.request!, this.env, "github_oauth", `Connect GitHub via OAuth for ${localId}`);
+
+        return redirectBack("GitHubアカウントと連携しました。");
     }
 
     /**

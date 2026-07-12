@@ -65,6 +65,36 @@ export class GitHubService extends GitHubBlogClient {
     }
 
     /**
+     * OAuth の認可コードをアクセストークンと交換する。
+     * @param clientId OAuth App の Client ID
+     * @param clientSecret OAuth App の Client Secret
+     * @param code GitHub から返ってきた認可コード
+     * @param redirectUri 認可時に使った redirect_uri (完全一致が必要)
+     * @returns アクセストークン。取得できなければ null
+     */
+    public static async exchangeOAuthCode(clientId: string, clientSecret: string, code: string, redirectUri: string): Promise<string | null> {
+        const res = await fetch("https://github.com/login/oauth/access_token", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+                "User-Agent": "osu-denken-admin-cloudflare-worker"
+            },
+            body: JSON.stringify({
+                client_id: clientId,
+                client_secret: clientSecret,
+                code,
+                redirect_uri: redirectUri
+            })
+        });
+
+        if (!res.ok) return null;
+
+        const data = await res.json() as { access_token?: string; error?: string };
+        return data.access_token ?? null;
+    }
+
+    /**
      * fake terminal の編集対象として許可されたファイルかどうか
      * @param filename ファイル名 (.md を含む)
      */

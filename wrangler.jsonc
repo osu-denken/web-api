@@ -60,9 +60,16 @@
 		// 新規登録は Google と招待コードのみ。自己登録と合言葉は既定でオフ ("true" で再開)
 		"ALLOW_SELF_REGISTRATION": "false",
 		"ALLOW_PASSPHRASE_REGISTRATION": "false",
+		
 		// 入部申請の通知メールを中継する Apps Script ウェブアプリの URL。
-		// MAIL_WEBHOOK_SECRET は `wrangler secret put MAIL_WEBHOOK_SECRET` で設定する
+		// MAIL_WEBHOOK_SECRET
 		// "MAIL_WEBHOOK_URL": "" // こっちもシークレットにしておいた
+
+		// GITHUB_OAUTH_CLIENT_SECRET
+		// SCOPE / SITE_ORIGIN は省略可 (既定: "public_repo read:org" / 本番ドメイン)
+		"GITHUB_OAUTH_CLIENT_ID": "Ov23liv9rV3xcX7raRn1"
+		// "GITHUB_OAUTH_SCOPE": "public_repo read:org",
+		// "SITE_ORIGIN": "https://osu-denken.github.io"
 	}
 	/**
 	 * Note: Use secrets to store sensitive data.
