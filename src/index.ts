@@ -17,6 +17,7 @@ import { TerminalController } from "./control/TerminalController";
 import { PrivatePostRepository } from "./util/service/private-posts-d1";
 import { PrivatePostController } from "./control/PrivatePostController";
 import { SitePageController } from "./control/SitePageController";
+import { LogController } from "./control/LogController";
 
 type ControllerFactory = (path: string[]) => IController;
 
@@ -34,6 +35,7 @@ const routes: Record<string, ControllerFactory> = {
   "terminal": (path) => new TerminalController(path),
   "private-posts": (path) => new PrivatePostController(path),
   "site-pages": (path) => new SitePageController(path),
+  "logs": (path) => new LogController(path),
   "v1/terminal": (path) => new TerminalController(path),
   "v1/ping" : (path) => new PingController(path),
   "v1/user": (path) => new UserController(path),

@@ -24,6 +24,8 @@ export enum Permission {
     ImageDelete = 1 << 13,
 
     InviteCodeCreate = 1 << 14,
+
+    LogView = 1 << 15,
 }
 
 /**
@@ -63,7 +65,8 @@ export const EXECUTIVE_DEFAULT_PERMISSIONS =
     Permission.MemberDelete |
     Permission.PageEdit |
     Permission.SwitchBotControl |
-    Permission.InviteCodeCreate;
+    Permission.InviteCodeCreate |
+    Permission.LogView;
 
 /** 役職ごとのデフォルト権限。ここに無い役職は権限を持たない */
 const ROLE_DEFAULT_PERMISSIONS: ReadonlyMap<Role, Permission> = new Map([

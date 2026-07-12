@@ -133,12 +133,19 @@ export function b64ToStr(b64: string): string {
  * @param ttl 
  */
 export async function logInfo(request: Request, env: Env, type: string, message: string, ttl = 60 * 60 * 24 * 365) { // default: 365 days
-	await env.LOGS.put(`${type}:${Date.now()}`, JSON.stringify(
-		{ 
-		    message,
-		    ip: request.headers.get("CF-Connecting-IP") || "unknown",
-		    userAgent: request.headers.get("User-Agent") || "unknown",
-		}, null, 2), { expirationTtl: ttl });
+	const ts = Date.now();
+	const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+	const userAgent = request.headers.get("User-Agent") || "unknown";
+
+	// キーは `${type}:${反転タイムスタンプ}` とし、KV の昇順リストで新しい順に並ぶようにする。
+	// list() はメタデータを返すので、閲覧側は値を都度 get せずに一覧を組める。
+	const invTs = String(1e15 - ts).padStart(15, "0");
+	const meta = { type, ts, message, ip, userAgent };
+
+	await env.LOGS.put(`${type}:${invTs}`, JSON.stringify(meta, null, 2), {
+		expirationTtl: ttl,
+		metadata: meta,
+	});
 }
 
 /**
