@@ -142,4 +142,25 @@ export class GitHubClient {
         if (token)
             this.token = token;
     }
+
+    /**
+     * 指定したトークンの持ち主の GitHub ログイン名を取得する。
+     * this.token は変更しない (招待は管理トークンで行うため)。
+     * @param token ユーザーの GitHub トークン
+     * @returns ログイン名。取得できなければ null
+     */
+    public async getLoginForToken(token: string): Promise<string | null> {
+        const res = await fetch("https://api.github.com/user", {
+            headers: {
+                "Authorization": `token ${token}`,
+                "Accept": "application/vnd.github+json",
+                "User-Agent": "osu-denken-admin-cloudflare-worker"
+            }
+        });
+
+        if (!res.ok) return null;
+
+        const data = await res.json() as { login?: string };
+        return data.login ?? null;
+    }
 }

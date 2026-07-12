@@ -3,7 +3,7 @@ import { ROSTER_STATUSES, toPublicMember } from "../util/member";
 import { Permission } from "../util/permission";
 import { UserCustomService } from "../util/service/user-custom";
 import { GitHubService } from "../util/service/github";
-import { createJsonResponse, encrypt, generateInviteCode, logInfo } from "../util/utils";
+import { createJsonResponse, decrypt, encrypt, generateInviteCode, logInfo } from "../util/utils";
 import { IController } from "./IController";
 
 export class PortalController extends IController {
@@ -19,6 +19,7 @@ export class PortalController extends IController {
         if (this.path[0] === "github") {
             if (this.path[1] === "invite") return this.githubInvite();
             if (this.path[1] === "join") return this.githubJoin();
+            if (this.path[1] === "username") return this.githubUsername();
             if (this.path[1] === "token") return this.githubToken();
             if (this.path[1] === "oauth") {
                 if (this.path[2] === "start") return this.githubOauthStart();
@@ -150,7 +151,34 @@ export class PortalController extends IController {
     }
 
     /**
-     * 部員が自分の GitHub アカウント名を指定して Organization への招待を受け取る。
+     * 連携済みの GitHub トークンからログイン名を取得する。未連携なら null。
+     * @param localId Firebase Local ID
+     */
+    private async connectedGitHubLogin(localId: string): Promise<string | null> {
+        const customData = await this.userCustom.get(localId);
+        if (!customData.githubTokenEncoded) return null;
+
+        try {
+            const token = await decrypt(customData.githubTokenEncoded, this.env.SECRET_KEY);
+            return await this.github?.getLoginForToken(token) ?? null;
+        } catch {
+            return null;
+        }
+    }
+
+    /**
+     * 連携済みの GitHub ログイン名を返す。フォームの出し分けに使う。
+     */
+    public async githubUsername() {
+        const auth = await this.resolveAuth();
+        const login = await this.connectedGitHubLogin(auth.user.localId);
+
+        return createJsonResponse({ success: true, username: login });
+    }
+
+    /**
+     * 部員が Organization への招待を受け取る。
+     * GitHub 連携済みならトークンからユーザー名を自動取得し、未連携なら手入力を使う。
      * 幹部でなくても、認証済みの部員であれば自分で参加できる。
      */
     public async githubJoin() {
@@ -159,8 +187,9 @@ export class PortalController extends IController {
         // 認証済みの部員であることだけ確認する (特別な権限は不要)
         const auth = await this.resolveAuth();
 
-        const { username } = await this.request.json() as { username: string };
-        const name = username?.trim();
+        const { username } = await this.request.json().catch(() => ({})) as { username?: string };
+        // 連携済みなら手入力が空でもトークンからログイン名を引く
+        const name = username?.trim() || await this.connectedGitHubLogin(auth.user.localId);
         if (!name) throw new HttpError(400, "BAD_REQUEST", "username is required");
 
         // GitHub のユーザー名は英数字とハイフン、先頭末尾はハイフン不可、1〜39文字
