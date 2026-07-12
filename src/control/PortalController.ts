@@ -258,7 +258,7 @@ export class PortalController extends IController {
         const state = params.get("state");
 
         const redirectBack = (msg: string) =>
-            Response.redirect(`${this.siteOrigin}/portal/?tab=settings&msg=${encodeURIComponent(msg)}`, 302);
+            Response.redirect(`${this.siteOrigin}/portal/?tab=integrations&msg=${encodeURIComponent(msg)}`, 302);
 
         if (!code || !state) return redirectBack("GitHub連携に失敗しました（不正なコールバック）。");
 
