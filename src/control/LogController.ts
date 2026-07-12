@@ -49,17 +49,7 @@ export class LogController extends IController {
             limit,
         });
 
-        const logs: LogMeta[] = listed.keys.map((key: any) => {
-            const meta = key.metadata as LogMeta | undefined;
-            // メタデータ導入前の古いキー (`${type}:${ts}`) はキー名から最低限を補う
-            return meta ?? {
-                type: key.name.split(":")[0] ?? "unknown",
-                ts: 0,
-                message: "(メタデータなし)",
-                ip: "unknown",
-                userAgent: "unknown",
-            };
-        });
+        const logs: LogMeta[] = await Promise.all(listed.keys.map((key: any) => this.toLogMeta(key)));
 
         // prefix なし (全種別) だと種別ごとにまとまるため、ページ内を時刻降順にそろえる
         logs.sort((a: LogMeta, b: LogMeta) => b.ts - a.ts);
@@ -69,5 +59,48 @@ export class LogController extends IController {
             cursor: listed.list_complete ? null : listed.cursor,
             complete: listed.list_complete,
         });
+    }
+
+    /**
+     * KV のキーを1件分の表示データに変換する。
+     * メタデータがあればそのまま使い、無い古いエントリは本体を読んで補う。
+     * @param key list() が返すキー
+     */
+    private async toLogMeta(key: any): Promise<LogMeta> {
+        const meta = key.metadata as LogMeta | undefined;
+        if (meta) return meta;
+
+        // メタデータ導入前のエントリ。キー末尾のタイムスタンプと本体 (JSON) から復元する。
+        const colon = key.name.lastIndexOf(":");
+        const type = colon >= 0 ? key.name.slice(0, colon) : "unknown";
+        const suffix = colon >= 0 ? key.name.slice(colon + 1) : "";
+        const ts = this.timestampFromSuffix(suffix);
+
+        let message = "(メタデータなし)";
+        let ip = "unknown";
+        let userAgent = "unknown";
+        try {
+            const raw = await this.env.LOGS.get(key.name);
+            if (raw) {
+                const body = JSON.parse(raw);
+                message = body.message ?? message;
+                ip = body.ip ?? ip;
+                userAgent = body.userAgent ?? userAgent;
+            }
+        } catch { /* 壊れた本体は既定値のまま */ }
+
+        return { type, ts, message, ip, userAgent };
+    }
+
+    /**
+     * キー末尾の数値からタイムスタンプを復元する。
+     * 新形式は反転タイムスタンプ (15桁)、旧形式は生のエポックミリ秒。
+     * @param suffix キー末尾
+     */
+    private timestampFromSuffix(suffix: string): number {
+        const n = Number(suffix);
+        if (!Number.isFinite(n)) return 0;
+        // 反転タイムスタンプは 1e15 - ts。生のミリ秒 (約1.7e12) より桁が大きい
+        return n > 5e14 ? 1e15 - n : n;
     }
 }
