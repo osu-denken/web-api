@@ -12,7 +12,7 @@ interface RegisterBody {
     name?: string;
     furigana?: string | null;
     tel?: string | null;
-    birthday?: string | null;
+    // birthday?: string | null;
     // 以下は任意。名簿の固定列ではないので customData に入れる
     hobby?: string | null;
     wish?: string | null;
@@ -80,7 +80,7 @@ export class MemberController extends IController {
 
         // 任意項目は空を捨てて customData にまとめる
         const customData: Record<string, string> = {};
-        if (body.birthday) customData.birthday = body.birthday;
+        // if (body.birthday) customData.birthday = body.birthday;
         if (body.hobby?.trim()) customData.hobby = body.hobby.trim();
         if (body.wish?.trim()) customData.wish = body.wish.trim();
         if (body.note?.trim()) customData.note = body.note.trim();
@@ -103,7 +103,7 @@ export class MemberController extends IController {
             email,
             name: body.name.trim(),
             furigana: body.furigana ?? null,
-            birthday: body.birthday ?? null,
+            // birthday: body.birthday ?? null,
             tel: body.tel ?? null,
             hobby: body.hobby ?? null,
             wish: body.wish ?? null,

@@ -129,7 +129,7 @@ for (const row of rows) {
 
     // スキーマに列を持たない項目は custom_data の JSON に逃がす
     const customData = JSON.parse(col(row, "customData") || "{}");
-    if (col(row, "birthday")) customData.birthday = col(row, "birthday");
+    // if (col(row, "birthday")) customData.birthday = col(row, "birthday");
 
     console.log(
         `INSERT INTO members (student_id, email, name, furigana, tel, status, role_bits, join_date, leave_date, custom_data) VALUES (` +

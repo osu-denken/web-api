@@ -6,7 +6,7 @@ export interface JoinNotification {
     email: string;
     name: string;
     furigana?: string | null;
-    birthday?: string | null;
+    // birthday?: string | null;
     tel?: string | null;
     hobby?: string | null;
     wish?: string | null;
@@ -36,9 +36,9 @@ export async function sendJoinNotification(env: Env, data: JoinNotification): Pr
         ["メールアドレス", data.email],
         ["氏名", data.name],
         ["フリガナ", data.furigana],
-        ["生年月日", data.birthday],
+        // ["生年月日", data.birthday],
         ["電話番号", data.tel],
-        ["趣味・特技", data.hobby],
+        ["趣味/特技", data.hobby],
         ["やってみたいこと", data.wish],
         ["連絡事項", data.note],
     ];
