@@ -69,7 +69,7 @@ export function normalizeStudentId(studentId: string): string {
     return withoutPrefix.toUpperCase();
 }
 
-/** 学籍番号の書式。s + 入学年度2桁 + 学部1文字 + 連番3桁 (例: s24h034) */
+/** 学籍番号の書式。s + 入学年度2桁 + 学部1文字 + 連番3桁 (例: s99x999) */
 const STUDENT_ID_PATTERN = /^s\d{2}[a-z]\d{3}$/;
 
 /**
@@ -89,7 +89,7 @@ export function normalizeStudentEmail(input: string, domain: string): string {
     const local = STUDENT_ID_PATTERN.test(rawLocal) ? rawLocal : `s${rawLocal}`;
 
     if (!STUDENT_ID_PATTERN.test(local))
-        throw HttpError.createBadRequest("Email must be a student ID like s24h034");
+        throw HttpError.createBadRequest("Email must be a student ID like s99x999");
 
     return `${local}@${domain}`;
 }
