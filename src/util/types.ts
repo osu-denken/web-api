@@ -11,10 +11,14 @@ export interface Env {
 	SWBOT_TOKEN: string;
 	SWBOT_CLIENT_SECRET: string;
 
+	SITE_DOMAIN: string; // 使用するドメイン eg. "osu-denken.net" or "osu-denken.github.io"
+
 	// GitHub OAuth App。CLIENT_ID は vars、CLIENT_SECRET は Cloudflare secret に置く。
 	// 未設定なら「GitHubで接続」機能は無効 (PAT 手入力は引き続き使える)
 	GITHUB_OAUTH_CLIENT_ID?: string;
 	GITHUB_OAUTH_CLIENT_SECRET?: string;
+	GITHUB_OAUTH_CLIENT_ID_OSUDENKEN_NET?: string;
+	GITHUB_OAUTH_CLIENT_SECRET_OSUDENKEN_NET?: string;
 	// 要求スコープ。未設定なら "public_repo read:org"
 	GITHUB_OAUTH_SCOPE?: string;
 	// 連携完了後に戻すサイトのオリジン。未設定なら本番ドメイン

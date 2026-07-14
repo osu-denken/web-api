@@ -41,7 +41,7 @@ export class GitHubController extends IController {
 
     /** 連携完了後に戻すサイトのオリジン */
     private get siteOrigin(): string {
-        return this.env.SITE_ORIGIN || "https://osu-denken.github.io";
+        return this.env.SITE_ORIGIN || "https://" + this.env.SITE_DOMAIN;
     }
 
     /** OAuth の redirect_uri。認可時とトークン交換時で完全一致させる必要がある */
@@ -154,7 +154,7 @@ export class GitHubController extends IController {
         this.requirePost();
         const auth = await this.checkAuthAndPermission(Permission.BlogEdit);
 
-        const clientId = this.env.GITHUB_OAUTH_CLIENT_ID;
+        const clientId = this.env.SITE_DOMAIN === "osu-denken.net" ? this.env.GITHUB_OAUTH_CLIENT_ID_OSUDENKEN_NET : this.env.GITHUB_OAUTH_CLIENT_ID;
         if (!clientId) throw new HttpError(500, "NOT_CONFIGURED", "GitHub OAuth is not configured");
 
         // state はワンタイム。コールバックまでの10分だけ localId と結びつける
@@ -190,8 +190,8 @@ export class GitHubController extends IController {
         if (!localId) return redirectBack("GitHub連携の有効期限が切れました。もう一度お試しください。");
         await this.env.CACHE.delete(`${OAUTH_STATE_PREFIX}${state}`);
 
-        const clientId = this.env.GITHUB_OAUTH_CLIENT_ID;
-        const clientSecret = this.env.GITHUB_OAUTH_CLIENT_SECRET;
+        const clientId = this.env.SITE_DOMAIN === "osu-denken.net" ? this.env.GITHUB_OAUTH_CLIENT_ID_OSUDENKEN_NET : this.env.GITHUB_OAUTH_CLIENT_ID;
+        const clientSecret = this.env.SITE_DOMAIN === "osu-denken.net" ? this.env.GITHUB_OAUTH_CLIENT_SECRET_OSUDENKEN_NET : this.env.GITHUB_OAUTH_CLIENT_SECRET;
         if (!clientId || !clientSecret) return redirectBack("GitHub連携が設定されていません。");
 
         const token = await GitHubService.exchangeOAuthCode(clientId, clientSecret, code, this.oauthRedirectUri);

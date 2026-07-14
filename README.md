@@ -2,6 +2,7 @@
 大阪産業大学 電子計算研究部の [電研公式サイト](https://osu-denken.github.io/) のバックエンド API <br />
 Cloudflare Workers上で稼働しています。
 
+- https://api.osu-denken.net/
 - https://api.osudenken4dev.workers.dev/
 
 ## 機能

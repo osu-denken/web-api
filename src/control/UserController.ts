@@ -204,7 +204,7 @@ export class UserController extends IController {
         if (!claimEmail || !claimEmail.endsWith(this.env.ALLOWED_EMAIL_DOMAIN))
             throw HttpError.createForbidden(`Email must be from ${this.env.ALLOWED_EMAIL_DOMAIN} domain`);
 
-        const requestUri = this.request.headers.get("Origin") ?? "https://osu-denken.github.io";
+        const requestUri = this.request.headers.get("Origin") ?? "https://" + this.env.SITE_DOMAIN;
         const data: any = await this.firebase.signInWithIdp(credential, "google.com", requestUri);
 
         if (!data?.idToken || !data?.refreshToken) return createJsonResponse(data);
@@ -255,7 +255,7 @@ export class UserController extends IController {
         if (!claimEmail || !claimEmail.endsWith(this.env.ALLOWED_EMAIL_DOMAIN))
             throw HttpError.createForbidden(`Email must be from ${this.env.ALLOWED_EMAIL_DOMAIN} domain`);
 
-        const requestUri = this.request.headers.get("Origin") ?? "https://osu-denken.github.io";
+        const requestUri = this.request.headers.get("Origin") ?? "https://" + this.env.SITE_DOMAIN;
         // idToken を渡すことで、新規サインインではなく現在のアカウントへの連携になる
         const data: any = await this.firebase.signInWithIdp(credential, "google.com", requestUri, this.authorization);
 
