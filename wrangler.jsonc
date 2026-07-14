@@ -71,7 +71,6 @@
 		// "MAIL_WEBHOOK_URL": "" // こっちもシークレットにしておいた
 
 		// GITHUB_OAUTH_CLIENT_SECRET
-		// TODO: GITHUB_OAUTH_CLIENT_SECRET_OSUDENKEN_NET も設定すること
 		// GITHUB_OAUTH_CLIENT_SECRET_OSUDENKEN_NET
 		// SCOPE / SITE_ORIGIN は省略可 (既定: "public_repo read:org" / 本番ドメイン)
 		// "GITHUB_OAUTH_SCOPE": "public_repo read:org",
