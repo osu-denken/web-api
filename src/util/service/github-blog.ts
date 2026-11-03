@@ -18,9 +18,9 @@ export class GitHubBlogClient extends GitHubClient {
         return this.target === DEFAULT_TARGET;
     }
 
-    /** 固定ページは旧 blog のリポジトリにだけある。別の保存先では扱わない */
-    protected assertDefaultTarget() {
-        if (!this.isDefaultTarget()) throw new HttpError(400, "BAD_REQUEST", "Static pages are not available for this target");
+    /** 固定ページのパス（保存先のフォルダの下） */
+    protected pagePath(path: string) {
+        return this.target.pagesDir ? `${this.target.pagesDir}/${path}` : path;
     }
     /**
      * 記事ページの一覧
@@ -38,8 +38,7 @@ export class GitHubBlogClient extends GitHubClient {
      * 固定ページの一覧
      */
     public async getStaticPageList() {
-        this.assertDefaultTarget();
-        const res = await this.getFileContent("");
+        const res = await this.getFileContent(this.target.pagesDir, this.target.repo);
 
         if (res.status === 404)
             throw new HttpError(404, "NOT_FOUND", "All files not found");
@@ -66,10 +65,9 @@ export class GitHubBlogClient extends GitHubClient {
      * @returns ソース
      */
     public async getStaticPageRaw(path: string) {
-        this.assertDefaultTarget();
         await GitHubBlogClient.checkSafePath(path);
 
-        const res: any = await this.getFileContent(`${path}`);
+        const res: any = await this.getFileContent(this.pagePath(path), this.target.repo);
 
         if (res.status === 404)
             throw new HttpError(404, "NOT_FOUND", "Static page not found");
@@ -111,10 +109,9 @@ export class GitHubBlogClient extends GitHubClient {
      * @returns
      */
     public async updateStaticPage(slug: string, content: string, message: string = "Update static page via Cloudflare Worker", sha?: string) {
-        this.assertDefaultTarget();
         await GitHubBlogClient.checkSafePath(slug, true);
 
-        return this.uploadFile(`${slug}.md`, toBase64(content), message, sha);
+        return this.uploadFile(this.pagePath(`${slug}.md`), toBase64(content), message, sha, this.target.repo);
     }
 
     /**
@@ -195,8 +192,7 @@ export class GitHubBlogClient extends GitHubClient {
      * 固定ページの削除
      */
     public async deleteStaticPage(slug: string, message: string = "Delete static page via Cloudflare Worker") {
-        this.assertDefaultTarget();
         await GitHubBlogClient.checkSafePath(slug, true);
-        return this.deleteFile(`${slug}.md`, undefined, message);
+        return this.deleteFile(this.pagePath(`${slug}.md`), undefined, message, this.target.repo);
     }
 }

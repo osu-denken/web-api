@@ -8,9 +8,9 @@ export const REPO = "blog";
 export const BRANCH = "main";
 
 /** 記事と画像の保存先。既定は旧 blog（Jekyll）。denken は新しい記事リポジトリ */
-export type ContentTarget = { repo: string; postsDir: string; imagesDir: string };
-export const DEFAULT_TARGET: ContentTarget = { repo: REPO, postsDir: "_posts", imagesDir: "images" };
-export const DENKEN_TARGET: ContentTarget = { repo: "denken-articles", postsDir: "content/posts", imagesDir: "static/images" };
+export type ContentTarget = { repo: string; postsDir: string; imagesDir: string; pagesDir: string };
+export const DEFAULT_TARGET: ContentTarget = { repo: REPO, postsDir: "_posts", imagesDir: "images", pagesDir: "" };
+export const DENKEN_TARGET: ContentTarget = { repo: "denken-articles", postsDir: "content/posts", imagesDir: "static/images", pagesDir: "content/pages" };
 
 /**
  * GitHub Contents API の薄いラッパ。
