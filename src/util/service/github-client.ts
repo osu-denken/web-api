@@ -4,7 +4,7 @@ import { Env } from "../types";
 import { decrypt } from "../utils";
 
 export const OWNER = "osu-denken";
-export const REPO = "blog";
+export const REPO = "legacy-blog";
 export const BRANCH = "main";
 
 /** 記事と画像の保存先。既定は旧 blog（Jekyll）。denken は新しい記事リポジトリ */
