@@ -45,6 +45,8 @@ const routes: Record<string, ControllerFactory> = {
   "v1/image": (path) => new ImageController(path),
   "v1/portal": (path) => new PortalController(path),
   "v2/blog": (path) => new BlogController(path),
+  "v3/blog": (path) => new BlogController(path),
+  "v3/image": (path) => new ImageController(path),
   "v1/switchbot": (path) => new SwitchBotController(path),
 };
 
