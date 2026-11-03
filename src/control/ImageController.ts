@@ -37,7 +37,7 @@ export class ImageController extends IController {
     }
 
     public route() {
-        const target = blogTargetFrom(this.request?.headers.get("x-blog-target"));
+        const target = blogTargetFrom(this.request?.headers.get("x-blog-target") ?? (this.path[0] === "v3" ? "denken" : null));
         if (target) this.github?.setTarget(target);
 
         if (this.path[2] === "list") return this.list();

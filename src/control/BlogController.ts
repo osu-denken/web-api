@@ -20,7 +20,8 @@ export class BlogController extends IController {
      * x-blog-target ヘッダーで保存先を選ぶ。ヘッダーが無ければ旧 blog（既定）
      */
     private applyTarget() {
-        const name = this.request?.headers.get("x-blog-target");
+        // v3 は新しい記事リポジトリ（denken）が既定。v2 は旧 blog が既定のまま
+        const name = this.request?.headers.get("x-blog-target") ?? (this.path[0] === "v3" ? "denken" : null);
         if (!name) return;
         if (name !== "denken") throw HttpError.createBadRequest("Unknown blog target");
 
@@ -53,7 +54,7 @@ export class BlogController extends IController {
             if (this.path[2] === "update-static") return this.updateStaticPageV1();
         }
 
-        if (this.path[0] === "v2") {
+        if (this.path[0] === "v2" || this.path[0] === "v3") {
             if (this.path[2] === "list") return this.getPostList();
             if (this.path[2] === "list-static") return this.getStaticPageList();
             if (this.path[2] === "get") return this.getPost();

@@ -66,7 +66,7 @@ export default {
 		let controller: IController | null = null;
 
 		let base = path[0];
-		if (path[0] === "v1" || path[0] === "v2") { // v1 / v2がある場合
+		if (path[0] === "v1" || path[0] === "v2" || path[0] === "v3") { // v1 / v2 / v3 がある場合
 			base = `${path[0]}/${path[1]}`;
 		}
 
