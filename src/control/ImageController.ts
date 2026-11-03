@@ -1,4 +1,5 @@
 import { CustomHttpError } from "../util/CustomHttpError";
+import { blogTargetFrom } from "../util/service/github-client";
 import { HttpError } from "../util/HttpError";
 import { Permission } from "../util/permission";
 import { toBase64, createJsonResponse, logInfo } from "../util/utils";
@@ -36,6 +37,9 @@ export class ImageController extends IController {
     }
 
     public route() {
+        const target = blogTargetFrom(this.request?.headers.get("x-blog-target"));
+        if (target) this.github?.setTarget(target);
+
         if (this.path[2] === "list") return this.list();
         if (this.path[2] === "upload") return this.upload();
         if (this.path[2] === "delete") return this.delete();

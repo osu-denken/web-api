@@ -94,6 +94,7 @@ export class GitHubBlogClient extends GitHubClient {
 
         const parsed = parseFrontMatter(source);
 
+        post.raw = source;
         post.content = parsed.content;
         post.meta = parsed.meta;
 

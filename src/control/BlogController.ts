@@ -174,7 +174,8 @@ export class BlogController extends IController {
             sha: post.sha,
             size: post.size,
             meta: post.meta,
-            content: post.content
+            content: post.content,
+            raw: post.raw
         });
     }
 
@@ -201,9 +202,11 @@ export class BlogController extends IController {
         const page = body.page ?? this.request.headers.get("page");
         const { meta, content: _content } = body;
 
-        if (!page || !_content || !meta) throw HttpError.createBadRequest("page, meta and content are required");
+        // text があれば、front matter を含む元のテキストをそのまま保存する（管理画面のエディタ用）
+        const text = (body as any).text as string | undefined;
+        if (!page || (!text && (!_content || !meta))) throw HttpError.createBadRequest("page and text (or meta and content) are required");
 
-        const content = createFrontMatter(meta, _content);
+        const content = text ?? createFrontMatter(meta!, _content!);
 
         const res = await this.github.updatePost(`${page}`, content);
         const data2: any = await res.json();

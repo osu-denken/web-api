@@ -10,6 +10,13 @@ export const BRANCH = "main";
 /** 記事と画像の保存先。既定は旧 blog（Jekyll）。denken は新しい記事リポジトリ */
 export type ContentTarget = { repo: string; postsDir: string; imagesDir: string; pagesDir: string };
 export const DEFAULT_TARGET: ContentTarget = { repo: REPO, postsDir: "_posts", imagesDir: "images", pagesDir: "" };
+/** x-blog-target ヘッダーから保存先を選ぶ。ヘッダーが無ければ null（既定のまま） */
+export function blogTargetFrom(name: string | null | undefined): ContentTarget | null {
+    if (!name) return null;
+    if (name === "denken") return DENKEN_TARGET;
+    throw new Error("Unknown blog target");
+}
+
 export const DENKEN_TARGET: ContentTarget = { repo: "denken-articles", postsDir: "content/posts", imagesDir: "static/images", pagesDir: "content/pages" };
 
 /**
