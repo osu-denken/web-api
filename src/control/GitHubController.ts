@@ -27,6 +27,7 @@ export class GitHubController extends IController {
         if (action === "join") return this.join();
         if (action === "username") return this.username();
         if (action === "token") return this.token();
+        if (action === "session-token") return this.sessionToken();
         if (action === "oauth") {
             if (this.path[2] === "start") return this.oauthStart();
             if (this.path[2] === "callback") return this.oauthCallback();
@@ -209,6 +210,35 @@ export class GitHubController extends IController {
     /**
      * GitHub PAT の取得・設定・削除。ブログ編集権限が要る。
      */
+    /** 公式サイトの管理画面（gh-admin）が、ブラウザから GitHub を直接叩くためのトークンを返す。
+     *  ログイン中で記事の編集権限を持つ部員だけ。応答は保存させず、取得はログに残す */
+    private static readonly SESSION_TOKEN_ORIGINS = ["https://osu-denken.net", "https://osu-denken.github.io", "http://localhost:1323"];
+
+    public async sessionToken() {
+        if (this.request?.method !== "GET") throw HttpError.createMethodNotAllowedPostOnly();
+        const auth = await this.checkAuthAndPermission(Permission.BlogEdit);
+        const localId = auth.user.localId;
+
+        const customData = await this.userCustom.get(localId);
+        if (!customData.githubTokenEncoded) throw HttpError.createNotFound("GitHub is not connected");
+        const token = await decrypt(customData.githubTokenEncoded, this.env.SECRET_KEY);
+
+        await logInfo(this.request, this.env, "portal", `session github token issued to ${localId}`);
+
+        const origin = this.request.headers.get("Origin") ?? "";
+        const allowOrigin = GitHubController.SESSION_TOKEN_ORIGINS.includes(origin) ? origin : "null";
+        return new Response(JSON.stringify({ success: true, token }), {
+            status: 200,
+            headers: {
+                "Content-Type": "application/json",
+                "Cache-Control": "no-store",
+                "Access-Control-Allow-Origin": allowOrigin,
+                "Access-Control-Allow-Headers": "Authorization",
+                "Vary": "Origin",
+            },
+        });
+    }
+
     public async token() {
         const auth = await this.checkAuthAndPermission(Permission.BlogEdit);
         const localId = auth.user.localId;
