@@ -3,6 +3,7 @@ import { HttpError } from "../util/HttpError";
 import { Permission } from "../util/permission";
 import { b64ToStr, createFrontMatter, createJsonResponse, logInfo, parseFrontMatter } from "../util/utils";
 import { IController } from "./IController";
+import { DENKEN_TARGET } from "../util/service/github-client";
 
 /** POST /v2/blog/update の本文 */
 interface UpdateBody {
@@ -12,6 +13,20 @@ interface UpdateBody {
 }
 
 export class BlogController extends IController {
+    /** メタデータのキャッシュのキーに付ける保存先の名前（既定は空） */
+    private cachePrefix = "";
+
+    /**
+     * x-blog-target ヘッダーで保存先を選ぶ。ヘッダーが無ければ旧 blog（既定）
+     */
+    private applyTarget() {
+        const name = this.request?.headers.get("x-blog-target");
+        if (!name) return;
+        if (name !== "denken") throw HttpError.createBadRequest("Unknown blog target");
+
+        this.github?.setTarget(DENKEN_TARGET);
+        this.cachePrefix = "denken:";
+    }
     public getParentPath(): string {
         return "blog";
     }
@@ -28,6 +43,8 @@ export class BlogController extends IController {
     }
 
     public route() {
+        this.applyTarget();
+
         if (this.path[0] === "v1") {
             if (this.path[2] === "list") return this.getListV1();
             if (this.path[2] === "get") return this.getPostV1();
@@ -123,7 +140,7 @@ export class BlogController extends IController {
 
         const post: any = await this.github.getPost(slug);
         
-        const cacheKey = `meta:${slug}`;
+        const cacheKey = `meta:${this.cachePrefix}${slug}`;
         await this.env.BLOG_META.put(cacheKey, JSON.stringify({ sha: post.sha, meta: post.meta }));
 
         return createJsonResponse({
@@ -212,7 +229,7 @@ export class BlogController extends IController {
      * @returns メタデータ
      */
     private async getMetaCached(slug: string, entry: any, load: (slug: string) => Promise<any>) {
-        const cacheKey = `meta:${slug}`;
+        const cacheKey = `meta:${this.cachePrefix}${slug}`;
         const cachedStr = await this.env.BLOG_META.get(cacheKey);
         const cached = cachedStr ? JSON.parse(cachedStr) : null;
 

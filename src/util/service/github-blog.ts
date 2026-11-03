@@ -1,17 +1,32 @@
 import { CustomHttpError } from "../CustomHttpError";
 import { HttpError } from "../HttpError";
 import { b64ToStr, toBase64, parseFrontMatter } from "../utils";
-import { GitHubClient, OWNER, REPO } from "./github-client";
+import { GitHubClient, ContentTarget, DEFAULT_TARGET, OWNER } from "./github-client";
 
 /**
  * blog リポジトリのコンテンツ。記事、固定ページ、画像を扱う。
  */
 export class GitHubBlogClient extends GitHubClient {
+    /** 記事と画像の保存先。既定は旧 blog */
+    protected target: ContentTarget = DEFAULT_TARGET;
+
+    public setTarget(target: ContentTarget) {
+        this.target = target;
+    }
+
+    public isDefaultTarget() {
+        return this.target === DEFAULT_TARGET;
+    }
+
+    /** 固定ページは旧 blog のリポジトリにだけある。別の保存先では扱わない */
+    protected assertDefaultTarget() {
+        if (!this.isDefaultTarget()) throw new HttpError(400, "BAD_REQUEST", "Static pages are not available for this target");
+    }
     /**
      * 記事ページの一覧
      */
     public async getPostList() {
-        const res = await this.getFileContent("_posts");
+        const res = await this.getFileContent(this.target.postsDir, this.target.repo);
 
         if (res.status === 404)
             throw new HttpError(404, "NOT_FOUND", "All posts not found");
@@ -23,6 +38,7 @@ export class GitHubBlogClient extends GitHubClient {
      * 固定ページの一覧
      */
     public async getStaticPageList() {
+        this.assertDefaultTarget();
         const res = await this.getFileContent("");
 
         if (res.status === 404)
@@ -38,7 +54,7 @@ export class GitHubBlogClient extends GitHubClient {
     public async getPostRaw(path: string) {
         await GitHubBlogClient.checkSafePath(path);
 
-        const res = await this.getFileContent(`_posts/${path}`);
+        const res = await this.getFileContent(`${this.target.postsDir}/${path}`, this.target.repo);
 
         if (res.status === 404) throw new HttpError(404, "NOT_FOUND", "Post not found");
         return res;
@@ -50,6 +66,7 @@ export class GitHubBlogClient extends GitHubClient {
      * @returns ソース
      */
     public async getStaticPageRaw(path: string) {
+        this.assertDefaultTarget();
         await GitHubBlogClient.checkSafePath(path);
 
         const res: any = await this.getFileContent(`${path}`);
@@ -94,6 +111,7 @@ export class GitHubBlogClient extends GitHubClient {
      * @returns
      */
     public async updateStaticPage(slug: string, content: string, message: string = "Update static page via Cloudflare Worker", sha?: string) {
+        this.assertDefaultTarget();
         await GitHubBlogClient.checkSafePath(slug, true);
 
         return this.uploadFile(`${slug}.md`, toBase64(content), message, sha);
@@ -110,14 +128,14 @@ export class GitHubBlogClient extends GitHubClient {
     public async updatePost(slug: string, content: string, message: string = "Update post via Cloudflare Worker", sha?: string) {
         await GitHubBlogClient.checkSafePath(slug);
 
-        return this.uploadFile(`_posts/${slug}.md`, toBase64(content), message, sha);
+        return this.uploadFile(`${this.target.postsDir}/${slug}.md`, toBase64(content), message, sha, this.target.repo);
     }
 
     /**
      * 画像の一覧 (images/)
      */
     public async getImageList() {
-        const res = await this.getFileContent("images");
+        const res = await this.getFileContent(this.target.imagesDir, this.target.repo);
 
         if (res.status === 404)
             throw new HttpError(404, "NOT_FOUND", "Image directory not found");
@@ -134,7 +152,7 @@ export class GitHubBlogClient extends GitHubClient {
     public async getImageCommitDate(filename: string): Promise<string | null> {
         await GitHubBlogClient.checkSafePath(filename, true);
 
-        const url = `https://api.github.com/repos/${OWNER}/${REPO}/commits?path=images/${encodeURIComponent(filename)}&per_page=1`;
+        const url = `https://api.github.com/repos/${OWNER}/${this.target.repo}/commits?path=${this.target.imagesDir}/${encodeURIComponent(filename)}&per_page=1`;
         const res = await this.request(url, "GET");
         if (!res.ok) return null;
 
@@ -151,7 +169,7 @@ export class GitHubBlogClient extends GitHubClient {
      */
     public async uploadImage(filename: string, contentBase64: string, message: string = "Upload image via Cloudflare Worker") {
         await GitHubBlogClient.checkSafePath(filename, true);
-        return this.uploadFile(`images/${filename}`, contentBase64, message);
+        return this.uploadFile(`${this.target.imagesDir}/${filename}`, contentBase64, message, undefined, this.target.repo);
     }
 
     /**
@@ -162,7 +180,7 @@ export class GitHubBlogClient extends GitHubClient {
      */
     public async deleteImage(filename: string, sha?: string, message: string = "Delete image via Cloudflare Worker") {
         await GitHubBlogClient.checkSafePath(filename, true);
-        return this.deleteFile(`images/${filename}`, sha, message);
+        return this.deleteFile(`${this.target.imagesDir}/${filename}`, sha, message, this.target.repo);
     }
 
     /**
@@ -170,13 +188,14 @@ export class GitHubBlogClient extends GitHubClient {
      */
     public async deletePost(slug: string, message: string = "Delete post via Cloudflare Worker") {
         await GitHubBlogClient.checkSafePath(slug);
-        return this.deleteFile(`_posts/${slug}.md`, undefined, message);
+        return this.deleteFile(`${this.target.postsDir}/${slug}.md`, undefined, message, this.target.repo);
     }
 
     /**
      * 固定ページの削除
      */
     public async deleteStaticPage(slug: string, message: string = "Delete static page via Cloudflare Worker") {
+        this.assertDefaultTarget();
         await GitHubBlogClient.checkSafePath(slug, true);
         return this.deleteFile(`${slug}.md`, undefined, message);
     }

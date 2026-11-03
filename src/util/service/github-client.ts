@@ -7,6 +7,11 @@ export const OWNER = "osu-denken";
 export const REPO = "blog";
 export const BRANCH = "main";
 
+/** 記事と画像の保存先。既定は旧 blog（Jekyll）。denken は新しい記事リポジトリ */
+export type ContentTarget = { repo: string; postsDir: string; imagesDir: string };
+export const DEFAULT_TARGET: ContentTarget = { repo: REPO, postsDir: "_posts", imagesDir: "images" };
+export const DENKEN_TARGET: ContentTarget = { repo: "denken-articles", postsDir: "content/posts", imagesDir: "static/images" };
+
 /**
  * GitHub Contents API の薄いラッパ。
  * どのリポジトリのどのファイルを触るかは、これを継承した側が決める。
@@ -82,10 +87,10 @@ export class GitHubClient {
      * @param sha ハッシュ値
      * @param message コミットメッセージ
      */
-    public async deleteFile(path: string, sha?: string, message: string = "Delete file via Cloudflare Worker") {
-        if (!sha) sha = await this.getSha(path);
+    public async deleteFile(path: string, sha?: string, message: string = "Delete file via Cloudflare Worker", repo: string = REPO) {
+        if (!sha) sha = await this.getSha(path, repo);
 
-        const url = `https://api.github.com/repos/${OWNER}/${REPO}/contents/${path}`;
+        const url = `https://api.github.com/repos/${OWNER}/${repo}/contents/${path}`;
         const body = { message, sha, branch: BRANCH };
 
         return this.request(url, "DELETE", body);
@@ -103,8 +108,8 @@ export class GitHubClient {
      * ファイルの SHA を取得する
      * @param path ファイルパス
      */
-    private async getSha(path: string): Promise<string> {
-        const res: any = await this.getFileContent(path);
+    private async getSha(path: string, repo: string = REPO): Promise<string> {
+        const res: any = await this.getFileContent(path, repo);
         if (!res.ok)
             throw new CustomHttpError(res.status, "NOT_FOUND", "File not found", await res.text());
 
