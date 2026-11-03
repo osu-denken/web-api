@@ -75,20 +75,46 @@ export class BlogController extends IController {
         const res: any = await this.github.getPostList();
         const posts: any[] = await res.json();
 
+        // メタデータは保存先ごとに 1 つの KV にまとめる。変わった記事だけ GitHub から取り直す
+        const indexKey = `meta-index:${this.cachePrefix || "blog"}`;
+        const index: Record<string, { sha: string; meta: any }> = JSON.parse((await this.env.BLOG_META.get(indexKey)) ?? "{}");
+        let changed = false;
+
         for (const post of posts) {
             if (!post.name.endsWith(".md"))
                 continue;
 
             post.name = post.name.replace(".md", "");
 
+            const hit = index[post.name];
+            if (hit && hit.sha === post.sha) {
+                post.meta = hit.meta;
+                continue;
+            }
+
             // 1本のメタが取れなくても一覧そのものは返す
             try {
-                post.meta = await this.getMetaCached(post.name, post, slug => this.loadPostFile(slug));
+                const file = await this.loadPostFile(post.name);
+                let content = file?.content ?? "";
+                if (file?.encoding === "base64") content = b64ToStr(content);
+                post.meta = content ? parseFrontMatter(content).meta || {} : {};
+                index[post.name] = { sha: post.sha, meta: post.meta };
+                changed = true;
             } catch (e: any) {
                 console.error(`Failed to load meta for "${post.name}":`, e?.message);
-                post.meta = {};
+                post.meta = hit?.meta ?? {};
             }
         }
+
+        // 消えた記事は索引からも消す
+        const names = new Set(posts.map(post => post.name));
+        for (const key of Object.keys(index)) {
+            if (!names.has(key)) {
+                delete index[key];
+                changed = true;
+            }
+        }
+        if (changed) await this.env.BLOG_META.put(indexKey, JSON.stringify(index));
 
         return createJsonResponse(
             posts.map(post => ({
